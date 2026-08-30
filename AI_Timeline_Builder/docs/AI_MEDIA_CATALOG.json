@@ -1,0 +1,3390 @@
+{
+  "version": 1,
+  "generated_by": "tools/build_catalog.py",
+  "purpose": "AI 生成 Timeline JSON 时的唯一能力清单：这里没有的能力就是没有。",
+  "contract": {
+    "ai_outputs": "Timeline JSON only",
+    "ai_never_outputs": "TSX / React / 渲染代码",
+    "time_unit": "seconds",
+    "schema_version": 1,
+    "sparse_rule": "字段等于 Runtime 默认值就不要写",
+    "defaults": {
+      "transform": {
+        "x": 0.5,
+        "y": 0.5,
+        "scale": 1.0,
+        "rotation": 0.0,
+        "opacity": 1.0
+      },
+      "speed": 1.0,
+      "volume": 1.0,
+      "audio": {
+        "enabled": true,
+        "volume": 1.0
+      },
+      "fade": {
+        "in": 0.0,
+        "out": 0.0
+      },
+      "background": "#000000",
+      "master_volume": 1.0
+    }
+  },
+  "renderer_discovery": {
+    "note": "已从 Remotion 运行时注册表读取",
+    "runtime_effects": [
+      "zoom",
+      "shake",
+      "spin",
+      "bounce",
+      "pulse",
+      "blur",
+      "motion_blur",
+      "brightness",
+      "contrast",
+      "saturation",
+      "flash",
+      "vignette",
+      "rgb_split",
+      "glitch"
+    ],
+    "runtime_transitions": [
+      "fade",
+      "crossfade",
+      "flash",
+      "whip",
+      "zoom",
+      "wipe",
+      "slide",
+      "push",
+      "spin",
+      "blur",
+      "glitch"
+    ]
+  },
+  "element_types": {
+    "video": "视频片段",
+    "overlay": "图片/Overlay",
+    "text": "文字",
+    "caption": "字幕",
+    "caption_group": "逐词字幕",
+    "audio": "音频",
+    "effect": "特效",
+    "transition": "转场",
+    "freeze": "冻结帧"
+  },
+  "tracks": {
+    "presets": [
+      {
+        "id": "A1",
+        "name": "A1 背景音乐",
+        "kind": "audio",
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "id": "A2",
+        "name": "A2 人声",
+        "kind": "audio",
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "id": "A3",
+        "name": "A3 音效",
+        "kind": "audio",
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "id": "V1",
+        "name": "V1 主视频",
+        "kind": "video",
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "id": "V2",
+        "name": "V2 视频叠加",
+        "kind": "video",
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "id": "V3",
+        "name": "V3 图片/Overlay",
+        "kind": "video",
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "id": "V4",
+        "name": "V4 高层 Overlay",
+        "kind": "video",
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "id": "T1",
+        "name": "T1 字幕",
+        "kind": "text",
+        "locked": false,
+        "hidden": false
+      },
+      {
+        "id": "T2",
+        "name": "T2 普通文字",
+        "kind": "text",
+        "locked": false,
+        "hidden": false
+      }
+    ],
+    "display_order": [
+      "T2",
+      "T1",
+      "V4",
+      "V3",
+      "V2",
+      "V1",
+      "A3",
+      "A2",
+      "A1"
+    ],
+    "type_to_kind": {
+      "video": "video",
+      "overlay": "video",
+      "freeze": "video",
+      "effect": "video",
+      "transition": "video",
+      "text": "text",
+      "caption": "text",
+      "caption_group": "text",
+      "audio": "audio"
+    }
+  },
+  "placement_policy": {
+    "video": {
+      "element_type": "video",
+      "default_track": "V1",
+      "fallback_tracks": [
+        "V2",
+        "V3",
+        "V4"
+      ],
+      "avoid_overlap": true,
+      "label": "视频"
+    },
+    "image": {
+      "element_type": "overlay",
+      "default_track": "V3",
+      "fallback_tracks": [
+        "V4",
+        "V2",
+        "V1"
+      ],
+      "avoid_overlap": true,
+      "label": "图片"
+    },
+    "overlay": {
+      "element_type": "overlay",
+      "default_track": "V4",
+      "fallback_tracks": [
+        "V3",
+        "V2"
+      ],
+      "avoid_overlap": true,
+      "label": "叠加素材"
+    },
+    "music": {
+      "element_type": "audio",
+      "default_track": "A1",
+      "fallback_tracks": [
+        "A2",
+        "A3"
+      ],
+      "avoid_overlap": true,
+      "label": "背景音乐"
+    },
+    "voice": {
+      "element_type": "audio",
+      "default_track": "A2",
+      "fallback_tracks": [
+        "A3",
+        "A1"
+      ],
+      "avoid_overlap": true,
+      "label": "人声"
+    },
+    "sfx": {
+      "element_type": "audio",
+      "default_track": "A3",
+      "fallback_tracks": [
+        "A2",
+        "A1"
+      ],
+      "avoid_overlap": true,
+      "label": "音效"
+    },
+    "caption": {
+      "element_type": "caption",
+      "default_track": "T1",
+      "fallback_tracks": [
+        "T2"
+      ],
+      "avoid_overlap": false,
+      "label": "字幕"
+    },
+    "text": {
+      "element_type": "text",
+      "default_track": "T2",
+      "fallback_tracks": [
+        "T1"
+      ],
+      "avoid_overlap": false,
+      "label": "文字"
+    },
+    "freeze": {
+      "element_type": "freeze",
+      "default_track": "V1",
+      "fallback_tracks": [
+        "V2",
+        "V3",
+        "V4"
+      ],
+      "avoid_overlap": true,
+      "label": "冻结帧"
+    }
+  },
+  "effects": [
+    {
+      "name": "bounce",
+      "label": "Bounce 弹跳",
+      "kind": "program",
+      "category": "geometry",
+      "display_category": "运动",
+      "renderer": "bounce",
+      "default_duration": 0.5,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "垂直方向弹跳衰减",
+      "params": [
+        {
+          "key": "height",
+          "label": "弹跳高度（画面比例）",
+          "type": "number",
+          "default": 0.08,
+          "min": 0.0,
+          "max": 0.5,
+          "step": 0.01
+        },
+        {
+          "key": "bounces",
+          "label": "弹跳次数",
+          "type": "int",
+          "default": 2,
+          "min": 1,
+          "max": 8,
+          "step": 1
+        }
+      ]
+    },
+    {
+      "name": "pulse",
+      "label": "Pulse 呼吸",
+      "kind": "program",
+      "category": "geometry",
+      "display_category": "运动",
+      "renderer": "pulse",
+      "default_duration": 0.8,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "周期性缩放，适合持续强调",
+      "params": [
+        {
+          "key": "scale_min",
+          "label": "最小 Scale",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 3.0,
+          "step": 0.01
+        },
+        {
+          "key": "scale_max",
+          "label": "最大 Scale",
+          "type": "number",
+          "default": 1.08,
+          "min": 0.1,
+          "max": 3.0,
+          "step": 0.01
+        },
+        {
+          "key": "cycles",
+          "label": "周期数",
+          "type": "int",
+          "default": 2,
+          "min": 1,
+          "max": 10,
+          "step": 1
+        }
+      ]
+    },
+    {
+      "name": "shake",
+      "label": "Shake 抖动",
+      "kind": "program",
+      "category": "geometry",
+      "display_category": "运动",
+      "renderer": "shake",
+      "default_duration": 0.4,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "按频率随机位移画面，制造冲击感",
+      "params": [
+        {
+          "key": "amplitude",
+          "label": "幅度（画面比例）",
+          "type": "number",
+          "default": 0.02,
+          "min": 0.0,
+          "max": 0.3,
+          "step": 0.005
+        },
+        {
+          "key": "frequency",
+          "label": "频率（次/秒）",
+          "type": "number",
+          "default": 18.0,
+          "min": 1.0,
+          "max": 60.0,
+          "step": 1.0
+        },
+        {
+          "key": "rotation",
+          "label": "附带旋转（度）",
+          "type": "number",
+          "default": 1.5,
+          "min": 0.0,
+          "max": 30.0,
+          "step": 0.5
+        }
+      ]
+    },
+    {
+      "name": "spin",
+      "label": "Spin 旋转",
+      "kind": "program",
+      "category": "geometry",
+      "display_category": "运动",
+      "renderer": "spin",
+      "default_duration": 0.5,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "画面整体旋转",
+      "params": [
+        {
+          "key": "from",
+          "label": "起始角度",
+          "type": "number",
+          "default": 0.0,
+          "min": -720.0,
+          "max": 720.0,
+          "step": 5.0
+        },
+        {
+          "key": "to",
+          "label": "结束角度",
+          "type": "number",
+          "default": 15.0,
+          "min": -720.0,
+          "max": 720.0,
+          "step": 5.0
+        }
+      ]
+    },
+    {
+      "name": "zoom",
+      "label": "Zoom 推拉",
+      "kind": "program",
+      "category": "geometry",
+      "display_category": "运动",
+      "renderer": "zoom",
+      "default_duration": 0.6,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "以指定中心点缩放画面，最常用的高光强调手法",
+      "params": [
+        {
+          "key": "scale_from",
+          "label": "起始 Scale",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 5.0,
+          "step": 0.01
+        },
+        {
+          "key": "scale_to",
+          "label": "结束 Scale",
+          "type": "number",
+          "default": 1.35,
+          "min": 0.1,
+          "max": 5.0,
+          "step": 0.01
+        },
+        {
+          "key": "origin_x",
+          "label": "中心 X",
+          "type": "number",
+          "default": 0.5,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.01
+        },
+        {
+          "key": "origin_y",
+          "label": "中心 Y",
+          "type": "number",
+          "default": 0.45,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.01
+        }
+      ]
+    },
+    {
+      "name": "dust",
+      "label": "Dust 灰尘",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 2.0,
+      "supported_targets": [],
+      "description": "空气尘埃，做氛围层",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "explosion",
+      "label": "Explosion 爆炸",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 0.8,
+      "supported_targets": [],
+      "description": "爆炸素材，常配 Impact 音效",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "fire",
+      "label": "Fire 火焰",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 1.2,
+      "supported_targets": [],
+      "description": "火焰素材叠加，建议放 V3/V4 轨",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "glow",
+      "label": "Glow 光晕",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 0.8,
+      "supported_targets": [],
+      "description": "光晕素材",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "light_leak",
+      "label": "Light Leak 漏光",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 1.0,
+      "supported_targets": [],
+      "description": "漏光素材，适合做转场衔接",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lightning",
+      "label": "Lightning 闪电",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 0.5,
+      "supported_targets": [],
+      "description": "闪电，配合 Flash 效果更强",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "particle",
+      "label": "Particle 粒子",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 1.5,
+      "supported_targets": [],
+      "description": "通用粒子素材",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "smoke",
+      "label": "Smoke 烟雾",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 1.5,
+      "supported_targets": [],
+      "description": "烟雾素材叠加",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "spark",
+      "label": "Spark 火花",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 0.6,
+      "supported_targets": [],
+      "description": "火花粒子",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "speed_lines",
+      "label": "Speed Lines 速度线",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "renderer": "",
+      "default_duration": 0.5,
+      "supported_targets": [],
+      "description": "速度线，强调运动方向",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "flash",
+      "label": "Flash 闪白",
+      "kind": "program",
+      "category": "screen",
+      "display_category": "光效",
+      "renderer": "flash",
+      "default_duration": 0.2,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "叠加一层纯色并快速衰减，常配合 Impact 音效",
+      "params": [
+        {
+          "key": "color",
+          "label": "颜色",
+          "type": "color",
+          "default": "#FFFFFF"
+        },
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.85,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "decay",
+          "label": "衰减曲线",
+          "type": "enum",
+          "default": "easeOut",
+          "options": [
+            "linear",
+            "easeIn",
+            "easeOut",
+            "easeInOut"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "glitch",
+      "label": "Glitch 故障",
+      "kind": "program",
+      "category": "screen",
+      "display_category": "风格",
+      "renderer": "glitch",
+      "default_duration": 0.35,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "横向条带错位 + 颜色抖动",
+      "params": [
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.6,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "slices",
+          "label": "条带数量",
+          "type": "int",
+          "default": 12,
+          "min": 2,
+          "max": 60,
+          "step": 1
+        },
+        {
+          "key": "color_shift",
+          "label": "颜色偏移 px",
+          "type": "number",
+          "default": 6.0,
+          "min": 0.0,
+          "max": 40.0,
+          "step": 1.0
+        }
+      ]
+    },
+    {
+      "name": "rgb_split",
+      "label": "RGB Split 色差",
+      "kind": "program",
+      "category": "screen",
+      "display_category": "风格",
+      "renderer": "rgb_split",
+      "default_duration": 0.3,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "红蓝通道错开，制造强烈的冲击感",
+      "params": [
+        {
+          "key": "offset",
+          "label": "偏移 px",
+          "type": "number",
+          "default": 8.0,
+          "min": 0.0,
+          "max": 60.0,
+          "step": 1.0
+        },
+        {
+          "key": "angle",
+          "label": "偏移角度",
+          "type": "number",
+          "default": 0.0,
+          "min": 0.0,
+          "max": 360.0,
+          "step": 5.0
+        }
+      ]
+    },
+    {
+      "name": "vignette",
+      "label": "Vignette 暗角",
+      "kind": "program",
+      "category": "screen",
+      "display_category": "光效",
+      "renderer": "vignette",
+      "default_duration": 1.0,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "四周压暗，把注意力收到中心",
+      "params": [
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.5,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "radius",
+          "label": "半径比例",
+          "type": "number",
+          "default": 0.75,
+          "min": 0.1,
+          "max": 1.5,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "name": "blur",
+      "label": "Blur 模糊",
+      "kind": "program",
+      "category": "visual",
+      "display_category": "画质",
+      "renderer": "blur",
+      "default_duration": 0.5,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "高斯模糊，从 from 值过渡到 to 值",
+      "params": [
+        {
+          "key": "radius_from",
+          "label": "起始半径 px",
+          "type": "number",
+          "default": 0.0,
+          "min": 0.0,
+          "max": 80.0,
+          "step": 1.0
+        },
+        {
+          "key": "radius_to",
+          "label": "结束半径 px",
+          "type": "number",
+          "default": 12.0,
+          "min": 0.0,
+          "max": 80.0,
+          "step": 1.0
+        }
+      ]
+    },
+    {
+      "name": "brightness",
+      "label": "Brightness 亮度",
+      "kind": "program",
+      "category": "visual",
+      "display_category": "调色",
+      "renderer": "brightness",
+      "default_duration": 0.5,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "1.0 为原始亮度",
+      "params": [
+        {
+          "key": "value_from",
+          "label": "起始值",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        },
+        {
+          "key": "value_to",
+          "label": "结束值",
+          "type": "number",
+          "default": 1.4,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "name": "contrast",
+      "label": "Contrast 对比度",
+      "kind": "program",
+      "category": "visual",
+      "display_category": "调色",
+      "renderer": "contrast",
+      "default_duration": 0.5,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "1.0 为原始对比度",
+      "params": [
+        {
+          "key": "value_from",
+          "label": "起始值",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        },
+        {
+          "key": "value_to",
+          "label": "结束值",
+          "type": "number",
+          "default": 1.3,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "name": "motion_blur",
+      "label": "Motion Blur 运动模糊",
+      "kind": "program",
+      "category": "visual",
+      "display_category": "画质",
+      "renderer": "motion_blur",
+      "default_duration": 0.3,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "沿指定方向拉伸模糊",
+      "params": [
+        {
+          "key": "amount",
+          "label": "强度 px",
+          "type": "number",
+          "default": 14.0,
+          "min": 0.0,
+          "max": 100.0,
+          "step": 1.0
+        },
+        {
+          "key": "angle",
+          "label": "方向角度",
+          "type": "number",
+          "default": 0.0,
+          "min": 0.0,
+          "max": 360.0,
+          "step": 5.0
+        }
+      ]
+    },
+    {
+      "name": "saturation",
+      "label": "Saturation 饱和度",
+      "kind": "program",
+      "category": "visual",
+      "display_category": "调色",
+      "renderer": "saturation",
+      "default_duration": 0.5,
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "description": "0 为黑白，1.0 为原始饱和度",
+      "params": [
+        {
+          "key": "value_from",
+          "label": "起始值",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        },
+        {
+          "key": "value_to",
+          "label": "结束值",
+          "type": "number",
+          "default": 1.6,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        }
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "name": "crossfade",
+      "label": "Crossfade 交叉溶解",
+      "category": "basic",
+      "display_category": "基础",
+      "renderer": "crossfade",
+      "default_duration": 0.5,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "两个片段直接叠化，没有中间色",
+      "params": [
+        {
+          "key": "easing",
+          "label": "缓动",
+          "type": "enum",
+          "default": "easeInOut",
+          "options": [
+            "linear",
+            "easeIn",
+            "easeOut",
+            "easeInOut"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "fade",
+      "label": "Fade 淡入淡出",
+      "category": "basic",
+      "display_category": "基础",
+      "renderer": "fade",
+      "default_duration": 0.5,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "经过纯色过渡，最稳的接法",
+      "params": [
+        {
+          "key": "color",
+          "label": "过渡颜色",
+          "type": "color",
+          "default": "#000000"
+        }
+      ]
+    },
+    {
+      "name": "push",
+      "label": "Push 推移",
+      "category": "geometric",
+      "display_category": "几何",
+      "renderer": "push",
+      "default_duration": 0.5,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "新片段把旧片段推出画面",
+      "params": [
+        {
+          "key": "direction",
+          "label": "方向",
+          "type": "enum",
+          "default": "left",
+          "options": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "slide",
+      "label": "Slide 滑入",
+      "category": "geometric",
+      "display_category": "几何",
+      "renderer": "slide",
+      "default_duration": 0.5,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "新片段滑入，旧片段不动",
+      "params": [
+        {
+          "key": "direction",
+          "label": "方向",
+          "type": "enum",
+          "default": "left",
+          "options": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wipe",
+      "label": "Wipe 擦除",
+      "category": "geometric",
+      "display_category": "几何",
+      "renderer": "wipe",
+      "default_duration": 0.5,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "沿方向用硬边擦过",
+      "params": [
+        {
+          "key": "direction",
+          "label": "方向",
+          "type": "enum",
+          "default": "left",
+          "options": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ]
+        },
+        {
+          "key": "feather",
+          "label": "边缘羽化 px",
+          "type": "number",
+          "default": 20.0,
+          "min": 0.0,
+          "max": 200.0,
+          "step": 5.0
+        }
+      ]
+    },
+    {
+      "name": "flash",
+      "label": "Flash 闪白转场",
+      "category": "impact",
+      "display_category": "冲击",
+      "renderer": "flash",
+      "default_duration": 0.3,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "闪白过渡，节奏点上最常用",
+      "params": [
+        {
+          "key": "color",
+          "label": "闪光颜色",
+          "type": "color",
+          "default": "#FFFFFF"
+        },
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.9,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "name": "whip",
+      "label": "Whip 甩镜",
+      "category": "impact",
+      "display_category": "冲击",
+      "renderer": "whip",
+      "default_duration": 0.5,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "带模糊的快速横甩，短视频里出现频率最高",
+      "params": [
+        {
+          "key": "direction",
+          "label": "方向",
+          "type": "enum",
+          "default": "left",
+          "options": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "位移强度",
+          "type": "number",
+          "default": 0.8,
+          "min": 0.0,
+          "max": 2.0,
+          "step": 0.05
+        },
+        {
+          "key": "blur",
+          "label": "模糊量",
+          "type": "number",
+          "default": 0.6,
+          "min": 0.0,
+          "max": 2.0,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "name": "zoom",
+      "label": "Zoom 缩放转场",
+      "category": "impact",
+      "display_category": "冲击",
+      "renderer": "zoom",
+      "default_duration": 0.4,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "前一段推进、后一段拉出",
+      "params": [
+        {
+          "key": "scale",
+          "label": "缩放倍数",
+          "type": "number",
+          "default": 1.6,
+          "min": 1.0,
+          "max": 5.0,
+          "step": 0.1
+        },
+        {
+          "key": "blur",
+          "label": "模糊量",
+          "type": "number",
+          "default": 0.3,
+          "min": 0.0,
+          "max": 2.0,
+          "step": 0.05
+        }
+      ]
+    },
+    {
+      "name": "blur",
+      "label": "Blur 模糊转场",
+      "category": "stylized",
+      "display_category": "风格",
+      "renderer": "blur",
+      "default_duration": 0.5,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "两边都模糊到最大再恢复",
+      "params": [
+        {
+          "key": "amount",
+          "label": "最大模糊 px",
+          "type": "number",
+          "default": 24.0,
+          "min": 0.0,
+          "max": 120.0,
+          "step": 2.0
+        }
+      ]
+    },
+    {
+      "name": "glitch",
+      "label": "Glitch 故障转场",
+      "category": "stylized",
+      "display_category": "风格",
+      "renderer": "glitch",
+      "default_duration": 0.35,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "条带错位切换",
+      "params": [
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.7,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "slices",
+          "label": "条带数量",
+          "type": "int",
+          "default": 14,
+          "min": 2,
+          "max": 60,
+          "step": 1
+        }
+      ]
+    },
+    {
+      "name": "spin",
+      "label": "Spin 旋转转场",
+      "category": "stylized",
+      "display_category": "风格",
+      "renderer": "spin",
+      "default_duration": 0.5,
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ],
+      "description": "旋转叠加缩放",
+      "params": [
+        {
+          "key": "angle",
+          "label": "旋转角度",
+          "type": "number",
+          "default": 90.0,
+          "min": -720.0,
+          "max": 720.0,
+          "step": 15.0
+        },
+        {
+          "key": "scale",
+          "label": "缩放倍数",
+          "type": "number",
+          "default": 1.3,
+          "min": 1.0,
+          "max": 4.0,
+          "step": 0.1
+        }
+      ]
+    }
+  ],
+  "sound_effects": {
+    "supported_categories": [
+      {
+        "key": "bgm",
+        "label": "背景音乐 BGM",
+        "track": "A1",
+        "description": "整段铺底的音乐，通常需要 fade in / out 与较低音量"
+      },
+      {
+        "key": "tts",
+        "label": "语音 / 配音",
+        "track": "A2",
+        "description": "TTS 合成或录制的人声旁白"
+      },
+      {
+        "key": "boom",
+        "label": "低频冲击 Boom",
+        "track": "A3",
+        "description": "重低音砸落，配合镜头切换或强调"
+      },
+      {
+        "key": "impact",
+        "label": "撞击 Impact",
+        "track": "A3",
+        "description": "打击、爆点，最常用的卡点音效"
+      },
+      {
+        "key": "whoosh",
+        "label": "呼啸 Whoosh",
+        "track": "A3",
+        "description": "快速划过的风声，配合甩镜 / 位移转场"
+      },
+      {
+        "key": "riser",
+        "label": "上升 Riser",
+        "track": "A3",
+        "description": "情绪上扬的铺垫音，落点前使用"
+      },
+      {
+        "key": "glass",
+        "label": "玻璃 Glass",
+        "track": "A3",
+        "description": "玻璃碎裂 / 清脆质感"
+      },
+      {
+        "key": "metal",
+        "label": "金属 Metal",
+        "track": "A3",
+        "description": "金属碰撞、刀剑质感"
+      },
+      {
+        "key": "wood",
+        "label": "木质 Wood",
+        "track": "A3",
+        "description": "木头敲击、闷响质感"
+      },
+      {
+        "key": "footstep",
+        "label": "脚步 Footstep",
+        "track": "A3",
+        "description": "不同地面的脚步声，做拟音用"
+      },
+      {
+        "key": "ui",
+        "label": "界面 UI",
+        "track": "A3",
+        "description": "点击、切换、提示等短音，做转场点缀"
+      },
+      {
+        "key": "soft",
+        "label": "轻柔 Soft",
+        "track": "A3",
+        "description": "柔和的短音，适合字幕出现 / 轻提示"
+      },
+      {
+        "key": "imported",
+        "label": "导入 Imported",
+        "track": "A3",
+        "description": "用户从外部导入的音频，未归类"
+      }
+    ],
+    "local_files": [
+      {
+        "id": "sfx_bgm_001",
+        "category": "bgm",
+        "path": "assets/audio/bgm/bgm_demo.wav",
+        "duration": 16.0
+      },
+      {
+        "id": "sfx_boom_001",
+        "category": "boom",
+        "path": "assets/audio/boom/boom_low_01.wav",
+        "duration": 1.2
+      },
+      {
+        "id": "sfx_boom_002",
+        "category": "boom",
+        "path": "assets/audio/boom/boom_punch_01.wav",
+        "duration": 0.8
+      },
+      {
+        "id": "sfx_footstep_001",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_carpet_000.ogg",
+        "duration": 0.145
+      },
+      {
+        "id": "sfx_footstep_002",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_carpet_001.ogg",
+        "duration": 0.145
+      },
+      {
+        "id": "sfx_footstep_003",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_carpet_002.ogg",
+        "duration": 0.145
+      },
+      {
+        "id": "sfx_footstep_004",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_carpet_003.ogg",
+        "duration": 0.145
+      },
+      {
+        "id": "sfx_footstep_005",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_carpet_004.ogg",
+        "duration": 0.145
+      },
+      {
+        "id": "sfx_footstep_006",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_concrete_000.ogg",
+        "duration": 0.106
+      },
+      {
+        "id": "sfx_footstep_007",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_concrete_001.ogg",
+        "duration": 0.108
+      },
+      {
+        "id": "sfx_footstep_008",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_concrete_002.ogg",
+        "duration": 0.113
+      },
+      {
+        "id": "sfx_footstep_009",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_concrete_003.ogg",
+        "duration": 0.11
+      },
+      {
+        "id": "sfx_footstep_010",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_concrete_004.ogg",
+        "duration": 0.114
+      },
+      {
+        "id": "sfx_footstep_011",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_grass_000.ogg",
+        "duration": 0.778
+      },
+      {
+        "id": "sfx_footstep_012",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_grass_001.ogg",
+        "duration": 0.674
+      },
+      {
+        "id": "sfx_footstep_013",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_grass_002.ogg",
+        "duration": 0.692
+      },
+      {
+        "id": "sfx_footstep_014",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_grass_003.ogg",
+        "duration": 0.669
+      },
+      {
+        "id": "sfx_footstep_015",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_grass_004.ogg",
+        "duration": 0.59
+      },
+      {
+        "id": "sfx_footstep_016",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_snow_000.ogg",
+        "duration": 0.374
+      },
+      {
+        "id": "sfx_footstep_017",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_snow_001.ogg",
+        "duration": 0.374
+      },
+      {
+        "id": "sfx_footstep_018",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_snow_002.ogg",
+        "duration": 0.374
+      },
+      {
+        "id": "sfx_footstep_019",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_snow_003.ogg",
+        "duration": 0.374
+      },
+      {
+        "id": "sfx_footstep_020",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_snow_004.ogg",
+        "duration": 0.374
+      },
+      {
+        "id": "sfx_footstep_021",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_wood_000.ogg",
+        "duration": 0.25
+      },
+      {
+        "id": "sfx_footstep_022",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_wood_001.ogg",
+        "duration": 0.252
+      },
+      {
+        "id": "sfx_footstep_023",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_wood_002.ogg",
+        "duration": 0.251
+      },
+      {
+        "id": "sfx_footstep_024",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_wood_003.ogg",
+        "duration": 0.252
+      },
+      {
+        "id": "sfx_footstep_025",
+        "category": "footstep",
+        "path": "assets/audio/footstep/footstep_wood_004.ogg",
+        "duration": 0.248
+      },
+      {
+        "id": "sfx_glass_001",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_heavy_000.ogg",
+        "duration": 0.241
+      },
+      {
+        "id": "sfx_glass_002",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_heavy_001.ogg",
+        "duration": 0.429
+      },
+      {
+        "id": "sfx_glass_003",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_heavy_002.ogg",
+        "duration": 0.247
+      },
+      {
+        "id": "sfx_glass_004",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_heavy_003.ogg",
+        "duration": 0.172
+      },
+      {
+        "id": "sfx_glass_005",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_heavy_004.ogg",
+        "duration": 0.399
+      },
+      {
+        "id": "sfx_glass_006",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_light_000.ogg",
+        "duration": 0.21
+      },
+      {
+        "id": "sfx_glass_007",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_light_001.ogg",
+        "duration": 0.21
+      },
+      {
+        "id": "sfx_glass_008",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_light_002.ogg",
+        "duration": 0.21
+      },
+      {
+        "id": "sfx_glass_009",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_light_003.ogg",
+        "duration": 0.21
+      },
+      {
+        "id": "sfx_glass_010",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_light_004.ogg",
+        "duration": 0.21
+      },
+      {
+        "id": "sfx_glass_011",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_medium_000.ogg",
+        "duration": 0.543
+      },
+      {
+        "id": "sfx_glass_012",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_medium_001.ogg",
+        "duration": 0.543
+      },
+      {
+        "id": "sfx_glass_013",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_medium_002.ogg",
+        "duration": 0.543
+      },
+      {
+        "id": "sfx_glass_014",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_medium_003.ogg",
+        "duration": 0.543
+      },
+      {
+        "id": "sfx_glass_015",
+        "category": "glass",
+        "path": "assets/audio/glass/impactGlass_medium_004.ogg",
+        "duration": 0.543
+      },
+      {
+        "id": "sfx_impact_001",
+        "category": "impact",
+        "path": "assets/audio/impact/impact_01.wav",
+        "duration": 0.6
+      },
+      {
+        "id": "sfx_impact_002",
+        "category": "impact",
+        "path": "assets/audio/impact/impactBell_heavy_000.ogg",
+        "duration": 1.48
+      },
+      {
+        "id": "sfx_impact_003",
+        "category": "impact",
+        "path": "assets/audio/impact/impactBell_heavy_001.ogg",
+        "duration": 1.741
+      },
+      {
+        "id": "sfx_impact_004",
+        "category": "impact",
+        "path": "assets/audio/impact/impactBell_heavy_002.ogg",
+        "duration": 0.697
+      },
+      {
+        "id": "sfx_impact_005",
+        "category": "impact",
+        "path": "assets/audio/impact/impactBell_heavy_003.ogg",
+        "duration": 0.654
+      },
+      {
+        "id": "sfx_impact_006",
+        "category": "impact",
+        "path": "assets/audio/impact/impactBell_heavy_004.ogg",
+        "duration": 0.301
+      },
+      {
+        "id": "sfx_impact_007",
+        "category": "impact",
+        "path": "assets/audio/impact/impactGeneric_light_000.ogg",
+        "duration": 0.139
+      },
+      {
+        "id": "sfx_impact_008",
+        "category": "impact",
+        "path": "assets/audio/impact/impactGeneric_light_001.ogg",
+        "duration": 0.118
+      },
+      {
+        "id": "sfx_impact_009",
+        "category": "impact",
+        "path": "assets/audio/impact/impactGeneric_light_002.ogg",
+        "duration": 0.14
+      },
+      {
+        "id": "sfx_impact_010",
+        "category": "impact",
+        "path": "assets/audio/impact/impactGeneric_light_003.ogg",
+        "duration": 0.138
+      },
+      {
+        "id": "sfx_impact_011",
+        "category": "impact",
+        "path": "assets/audio/impact/impactGeneric_light_004.ogg",
+        "duration": 0.14
+      },
+      {
+        "id": "sfx_impact_012",
+        "category": "impact",
+        "path": "assets/audio/impact/impactMining_000.ogg",
+        "duration": 0.937
+      },
+      {
+        "id": "sfx_impact_013",
+        "category": "impact",
+        "path": "assets/audio/impact/impactMining_001.ogg",
+        "duration": 0.869
+      },
+      {
+        "id": "sfx_impact_014",
+        "category": "impact",
+        "path": "assets/audio/impact/impactMining_002.ogg",
+        "duration": 0.805
+      },
+      {
+        "id": "sfx_impact_015",
+        "category": "impact",
+        "path": "assets/audio/impact/impactMining_003.ogg",
+        "duration": 0.992
+      },
+      {
+        "id": "sfx_impact_016",
+        "category": "impact",
+        "path": "assets/audio/impact/impactMining_004.ogg",
+        "duration": 0.83
+      },
+      {
+        "id": "sfx_impact_017",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_heavy_000.ogg",
+        "duration": 0.489
+      },
+      {
+        "id": "sfx_impact_018",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_heavy_001.ogg",
+        "duration": 0.352
+      },
+      {
+        "id": "sfx_impact_019",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_heavy_002.ogg",
+        "duration": 0.494
+      },
+      {
+        "id": "sfx_impact_020",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_heavy_003.ogg",
+        "duration": 0.347
+      },
+      {
+        "id": "sfx_impact_021",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_heavy_004.ogg",
+        "duration": 0.559
+      },
+      {
+        "id": "sfx_impact_022",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_light_000.ogg",
+        "duration": 0.542
+      },
+      {
+        "id": "sfx_impact_023",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_light_001.ogg",
+        "duration": 0.655
+      },
+      {
+        "id": "sfx_impact_024",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_light_002.ogg",
+        "duration": 0.489
+      },
+      {
+        "id": "sfx_impact_025",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_light_003.ogg",
+        "duration": 0.528
+      },
+      {
+        "id": "sfx_impact_026",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_light_004.ogg",
+        "duration": 0.657
+      },
+      {
+        "id": "sfx_impact_027",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_medium_000.ogg",
+        "duration": 0.609
+      },
+      {
+        "id": "sfx_impact_028",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_medium_001.ogg",
+        "duration": 0.616
+      },
+      {
+        "id": "sfx_impact_029",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_medium_002.ogg",
+        "duration": 0.515
+      },
+      {
+        "id": "sfx_impact_030",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_medium_003.ogg",
+        "duration": 0.654
+      },
+      {
+        "id": "sfx_impact_031",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPlate_medium_004.ogg",
+        "duration": 0.534
+      },
+      {
+        "id": "sfx_impact_032",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_heavy_000.ogg",
+        "duration": 0.649
+      },
+      {
+        "id": "sfx_impact_033",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_heavy_001.ogg",
+        "duration": 0.536
+      },
+      {
+        "id": "sfx_impact_034",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_heavy_002.ogg",
+        "duration": 0.457
+      },
+      {
+        "id": "sfx_impact_035",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_heavy_003.ogg",
+        "duration": 0.474
+      },
+      {
+        "id": "sfx_impact_036",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_heavy_004.ogg",
+        "duration": 0.536
+      },
+      {
+        "id": "sfx_impact_037",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_medium_000.ogg",
+        "duration": 0.431
+      },
+      {
+        "id": "sfx_impact_038",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_medium_001.ogg",
+        "duration": 0.405
+      },
+      {
+        "id": "sfx_impact_039",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_medium_002.ogg",
+        "duration": 0.541
+      },
+      {
+        "id": "sfx_impact_040",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_medium_003.ogg",
+        "duration": 0.455
+      },
+      {
+        "id": "sfx_impact_041",
+        "category": "impact",
+        "path": "assets/audio/impact/impactPunch_medium_004.ogg",
+        "duration": 0.543
+      },
+      {
+        "id": "sfx_metal_001",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_heavy_000.ogg",
+        "duration": 0.168
+      },
+      {
+        "id": "sfx_metal_002",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_heavy_001.ogg",
+        "duration": 0.359
+      },
+      {
+        "id": "sfx_metal_003",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_heavy_002.ogg",
+        "duration": 0.117
+      },
+      {
+        "id": "sfx_metal_004",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_heavy_003.ogg",
+        "duration": 0.207
+      },
+      {
+        "id": "sfx_metal_005",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_heavy_004.ogg",
+        "duration": 0.134
+      },
+      {
+        "id": "sfx_metal_006",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_light_000.ogg",
+        "duration": 0.351
+      },
+      {
+        "id": "sfx_metal_007",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_light_001.ogg",
+        "duration": 0.252
+      },
+      {
+        "id": "sfx_metal_008",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_light_002.ogg",
+        "duration": 0.236
+      },
+      {
+        "id": "sfx_metal_009",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_light_003.ogg",
+        "duration": 0.482
+      },
+      {
+        "id": "sfx_metal_010",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_light_004.ogg",
+        "duration": 0.213
+      },
+      {
+        "id": "sfx_metal_011",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_medium_000.ogg",
+        "duration": 0.272
+      },
+      {
+        "id": "sfx_metal_012",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_medium_001.ogg",
+        "duration": 0.143
+      },
+      {
+        "id": "sfx_metal_013",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_medium_002.ogg",
+        "duration": 0.119
+      },
+      {
+        "id": "sfx_metal_014",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_medium_003.ogg",
+        "duration": 0.254
+      },
+      {
+        "id": "sfx_metal_015",
+        "category": "metal",
+        "path": "assets/audio/metal/impactMetal_medium_004.ogg",
+        "duration": 0.109
+      },
+      {
+        "id": "sfx_metal_016",
+        "category": "metal",
+        "path": "assets/audio/metal/impactTin_medium_000.ogg",
+        "duration": 0.159
+      },
+      {
+        "id": "sfx_metal_017",
+        "category": "metal",
+        "path": "assets/audio/metal/impactTin_medium_001.ogg",
+        "duration": 0.174
+      },
+      {
+        "id": "sfx_metal_018",
+        "category": "metal",
+        "path": "assets/audio/metal/impactTin_medium_002.ogg",
+        "duration": 0.134
+      },
+      {
+        "id": "sfx_metal_019",
+        "category": "metal",
+        "path": "assets/audio/metal/impactTin_medium_003.ogg",
+        "duration": 0.215
+      },
+      {
+        "id": "sfx_metal_020",
+        "category": "metal",
+        "path": "assets/audio/metal/impactTin_medium_004.ogg",
+        "duration": 0.179
+      },
+      {
+        "id": "sfx_riser_001",
+        "category": "riser",
+        "path": "assets/audio/riser/downlifter_01.wav",
+        "duration": 1.0
+      },
+      {
+        "id": "sfx_riser_002",
+        "category": "riser",
+        "path": "assets/audio/riser/riser_up_01.wav",
+        "duration": 1.56
+      },
+      {
+        "id": "sfx_soft_001",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_heavy_000.ogg",
+        "duration": 0.505
+      },
+      {
+        "id": "sfx_soft_002",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_heavy_001.ogg",
+        "duration": 0.572
+      },
+      {
+        "id": "sfx_soft_003",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_heavy_002.ogg",
+        "duration": 0.572
+      },
+      {
+        "id": "sfx_soft_004",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_heavy_003.ogg",
+        "duration": 0.544
+      },
+      {
+        "id": "sfx_soft_005",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_heavy_004.ogg",
+        "duration": 0.501
+      },
+      {
+        "id": "sfx_soft_006",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_medium_000.ogg",
+        "duration": 0.118
+      },
+      {
+        "id": "sfx_soft_007",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_medium_001.ogg",
+        "duration": 0.183
+      },
+      {
+        "id": "sfx_soft_008",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_medium_002.ogg",
+        "duration": 0.135
+      },
+      {
+        "id": "sfx_soft_009",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_medium_003.ogg",
+        "duration": 0.14
+      },
+      {
+        "id": "sfx_soft_010",
+        "category": "soft",
+        "path": "assets/audio/soft/impactSoft_medium_004.ogg",
+        "duration": 0.147
+      },
+      {
+        "id": "sfx_tts_001",
+        "category": "tts",
+        "path": "assets/audio/tts/tts_20260830_115834_啊啊啊啊.wav",
+        "duration": 1.699
+      },
+      {
+        "id": "sfx_ui_001",
+        "category": "ui",
+        "path": "assets/audio/ui/back_001.ogg",
+        "duration": 0.064
+      },
+      {
+        "id": "sfx_ui_002",
+        "category": "ui",
+        "path": "assets/audio/ui/back_002.ogg",
+        "duration": 0.07
+      },
+      {
+        "id": "sfx_ui_003",
+        "category": "ui",
+        "path": "assets/audio/ui/back_003.ogg",
+        "duration": 0.093
+      },
+      {
+        "id": "sfx_ui_004",
+        "category": "ui",
+        "path": "assets/audio/ui/back_004.ogg",
+        "duration": 0.073
+      },
+      {
+        "id": "sfx_ui_005",
+        "category": "ui",
+        "path": "assets/audio/ui/bong_001.ogg",
+        "duration": 0.123
+      },
+      {
+        "id": "sfx_ui_006",
+        "category": "ui",
+        "path": "assets/audio/ui/click_001.ogg",
+        "duration": 0.1
+      },
+      {
+        "id": "sfx_ui_007",
+        "category": "ui",
+        "path": "assets/audio/ui/click_002.ogg",
+        "duration": 0.01
+      },
+      {
+        "id": "sfx_ui_008",
+        "category": "ui",
+        "path": "assets/audio/ui/click_003.ogg",
+        "duration": 0.01
+      },
+      {
+        "id": "sfx_ui_009",
+        "category": "ui",
+        "path": "assets/audio/ui/click_004.ogg",
+        "duration": 0.01
+      },
+      {
+        "id": "sfx_ui_010",
+        "category": "ui",
+        "path": "assets/audio/ui/click_005.ogg",
+        "duration": 0.01
+      },
+      {
+        "id": "sfx_ui_011",
+        "category": "ui",
+        "path": "assets/audio/ui/close_001.ogg",
+        "duration": 0.148
+      },
+      {
+        "id": "sfx_ui_012",
+        "category": "ui",
+        "path": "assets/audio/ui/close_002.ogg",
+        "duration": 0.314
+      },
+      {
+        "id": "sfx_ui_013",
+        "category": "ui",
+        "path": "assets/audio/ui/close_003.ogg",
+        "duration": 0.314
+      },
+      {
+        "id": "sfx_ui_014",
+        "category": "ui",
+        "path": "assets/audio/ui/close_004.ogg",
+        "duration": 0.323
+      },
+      {
+        "id": "sfx_ui_015",
+        "category": "ui",
+        "path": "assets/audio/ui/confirmation_001.ogg",
+        "duration": 0.29
+      },
+      {
+        "id": "sfx_ui_016",
+        "category": "ui",
+        "path": "assets/audio/ui/confirmation_002.ogg",
+        "duration": 0.539
+      },
+      {
+        "id": "sfx_ui_017",
+        "category": "ui",
+        "path": "assets/audio/ui/confirmation_003.ogg",
+        "duration": 0.322
+      },
+      {
+        "id": "sfx_ui_018",
+        "category": "ui",
+        "path": "assets/audio/ui/confirmation_004.ogg",
+        "duration": 0.49
+      },
+      {
+        "id": "sfx_ui_019",
+        "category": "ui",
+        "path": "assets/audio/ui/drop_001.ogg",
+        "duration": 0.11
+      },
+      {
+        "id": "sfx_ui_020",
+        "category": "ui",
+        "path": "assets/audio/ui/drop_002.ogg",
+        "duration": 0.191
+      },
+      {
+        "id": "sfx_ui_021",
+        "category": "ui",
+        "path": "assets/audio/ui/drop_003.ogg",
+        "duration": 0.191
+      },
+      {
+        "id": "sfx_ui_022",
+        "category": "ui",
+        "path": "assets/audio/ui/drop_004.ogg",
+        "duration": 0.287
+      },
+      {
+        "id": "sfx_ui_023",
+        "category": "ui",
+        "path": "assets/audio/ui/error_001.ogg",
+        "duration": 0.165
+      },
+      {
+        "id": "sfx_ui_024",
+        "category": "ui",
+        "path": "assets/audio/ui/error_002.ogg",
+        "duration": 0.165
+      },
+      {
+        "id": "sfx_ui_025",
+        "category": "ui",
+        "path": "assets/audio/ui/error_003.ogg",
+        "duration": 0.533
+      },
+      {
+        "id": "sfx_ui_026",
+        "category": "ui",
+        "path": "assets/audio/ui/error_004.ogg",
+        "duration": 0.103
+      },
+      {
+        "id": "sfx_ui_027",
+        "category": "ui",
+        "path": "assets/audio/ui/error_005.ogg",
+        "duration": 0.5
+      },
+      {
+        "id": "sfx_ui_028",
+        "category": "ui",
+        "path": "assets/audio/ui/error_006.ogg",
+        "duration": 0.5
+      },
+      {
+        "id": "sfx_ui_029",
+        "category": "ui",
+        "path": "assets/audio/ui/error_007.ogg",
+        "duration": 0.192
+      },
+      {
+        "id": "sfx_ui_030",
+        "category": "ui",
+        "path": "assets/audio/ui/error_008.ogg",
+        "duration": 0.139
+      },
+      {
+        "id": "sfx_ui_031",
+        "category": "ui",
+        "path": "assets/audio/ui/glass_001.ogg",
+        "duration": 0.278
+      },
+      {
+        "id": "sfx_ui_032",
+        "category": "ui",
+        "path": "assets/audio/ui/glass_002.ogg",
+        "duration": 0.125
+      },
+      {
+        "id": "sfx_ui_033",
+        "category": "ui",
+        "path": "assets/audio/ui/glass_003.ogg",
+        "duration": 0.124
+      },
+      {
+        "id": "sfx_ui_034",
+        "category": "ui",
+        "path": "assets/audio/ui/glass_004.ogg",
+        "duration": 0.692
+      },
+      {
+        "id": "sfx_ui_035",
+        "category": "ui",
+        "path": "assets/audio/ui/glass_005.ogg",
+        "duration": 0.111
+      },
+      {
+        "id": "sfx_ui_036",
+        "category": "ui",
+        "path": "assets/audio/ui/glass_006.ogg",
+        "duration": 0.111
+      },
+      {
+        "id": "sfx_ui_037",
+        "category": "ui",
+        "path": "assets/audio/ui/glitch_001.ogg",
+        "duration": 0.02
+      },
+      {
+        "id": "sfx_ui_038",
+        "category": "ui",
+        "path": "assets/audio/ui/glitch_002.ogg",
+        "duration": 0.03
+      },
+      {
+        "id": "sfx_ui_039",
+        "category": "ui",
+        "path": "assets/audio/ui/glitch_003.ogg",
+        "duration": 0.01
+      },
+      {
+        "id": "sfx_ui_040",
+        "category": "ui",
+        "path": "assets/audio/ui/glitch_004.ogg",
+        "duration": 0.023
+      },
+      {
+        "id": "sfx_ui_041",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_001.ogg",
+        "duration": 0.258
+      },
+      {
+        "id": "sfx_ui_042",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_002.ogg",
+        "duration": 0.258
+      },
+      {
+        "id": "sfx_ui_043",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_003.ogg",
+        "duration": 0.212
+      },
+      {
+        "id": "sfx_ui_044",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_004.ogg",
+        "duration": 0.418
+      },
+      {
+        "id": "sfx_ui_045",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_005.ogg",
+        "duration": 0.526
+      },
+      {
+        "id": "sfx_ui_046",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_006.ogg",
+        "duration": 0.38
+      },
+      {
+        "id": "sfx_ui_047",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_007.ogg",
+        "duration": 0.186
+      },
+      {
+        "id": "sfx_ui_048",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_008.ogg",
+        "duration": 0.225
+      },
+      {
+        "id": "sfx_ui_049",
+        "category": "ui",
+        "path": "assets/audio/ui/maximize_009.ogg",
+        "duration": 0.225
+      },
+      {
+        "id": "sfx_ui_050",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_001.ogg",
+        "duration": 0.258
+      },
+      {
+        "id": "sfx_ui_051",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_002.ogg",
+        "duration": 0.258
+      },
+      {
+        "id": "sfx_ui_052",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_003.ogg",
+        "duration": 0.212
+      },
+      {
+        "id": "sfx_ui_053",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_004.ogg",
+        "duration": 0.418
+      },
+      {
+        "id": "sfx_ui_054",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_005.ogg",
+        "duration": 0.526
+      },
+      {
+        "id": "sfx_ui_055",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_006.ogg",
+        "duration": 0.38
+      },
+      {
+        "id": "sfx_ui_056",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_007.ogg",
+        "duration": 0.186
+      },
+      {
+        "id": "sfx_ui_057",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_008.ogg",
+        "duration": 0.225
+      },
+      {
+        "id": "sfx_ui_058",
+        "category": "ui",
+        "path": "assets/audio/ui/minimize_009.ogg",
+        "duration": 0.225
+      },
+      {
+        "id": "sfx_ui_059",
+        "category": "ui",
+        "path": "assets/audio/ui/open_001.ogg",
+        "duration": 0.148
+      },
+      {
+        "id": "sfx_ui_060",
+        "category": "ui",
+        "path": "assets/audio/ui/open_002.ogg",
+        "duration": 0.314
+      },
+      {
+        "id": "sfx_ui_061",
+        "category": "ui",
+        "path": "assets/audio/ui/open_003.ogg",
+        "duration": 0.314
+      },
+      {
+        "id": "sfx_ui_062",
+        "category": "ui",
+        "path": "assets/audio/ui/open_004.ogg",
+        "duration": 0.323
+      },
+      {
+        "id": "sfx_ui_063",
+        "category": "ui",
+        "path": "assets/audio/ui/pluck_001.ogg",
+        "duration": 0.102
+      },
+      {
+        "id": "sfx_ui_064",
+        "category": "ui",
+        "path": "assets/audio/ui/pluck_002.ogg",
+        "duration": 0.165
+      },
+      {
+        "id": "sfx_ui_065",
+        "category": "ui",
+        "path": "assets/audio/ui/question_001.ogg",
+        "duration": 0.491
+      },
+      {
+        "id": "sfx_ui_066",
+        "category": "ui",
+        "path": "assets/audio/ui/question_002.ogg",
+        "duration": 0.333
+      },
+      {
+        "id": "sfx_ui_067",
+        "category": "ui",
+        "path": "assets/audio/ui/question_003.ogg",
+        "duration": 0.332
+      },
+      {
+        "id": "sfx_ui_068",
+        "category": "ui",
+        "path": "assets/audio/ui/question_004.ogg",
+        "duration": 0.332
+      },
+      {
+        "id": "sfx_ui_069",
+        "category": "ui",
+        "path": "assets/audio/ui/scratch_001.ogg",
+        "duration": 0.139
+      },
+      {
+        "id": "sfx_ui_070",
+        "category": "ui",
+        "path": "assets/audio/ui/scratch_002.ogg",
+        "duration": 0.139
+      },
+      {
+        "id": "sfx_ui_071",
+        "category": "ui",
+        "path": "assets/audio/ui/scratch_003.ogg",
+        "duration": 0.123
+      },
+      {
+        "id": "sfx_ui_072",
+        "category": "ui",
+        "path": "assets/audio/ui/scratch_004.ogg",
+        "duration": 0.325
+      },
+      {
+        "id": "sfx_ui_073",
+        "category": "ui",
+        "path": "assets/audio/ui/scratch_005.ogg",
+        "duration": 0.325
+      },
+      {
+        "id": "sfx_ui_074",
+        "category": "ui",
+        "path": "assets/audio/ui/scroll_001.ogg",
+        "duration": 1.0
+      },
+      {
+        "id": "sfx_ui_075",
+        "category": "ui",
+        "path": "assets/audio/ui/scroll_002.ogg",
+        "duration": 1.0
+      },
+      {
+        "id": "sfx_ui_076",
+        "category": "ui",
+        "path": "assets/audio/ui/scroll_003.ogg",
+        "duration": 1.0
+      },
+      {
+        "id": "sfx_ui_077",
+        "category": "ui",
+        "path": "assets/audio/ui/scroll_004.ogg",
+        "duration": 1.0
+      },
+      {
+        "id": "sfx_ui_078",
+        "category": "ui",
+        "path": "assets/audio/ui/scroll_005.ogg",
+        "duration": 1.0
+      },
+      {
+        "id": "sfx_ui_079",
+        "category": "ui",
+        "path": "assets/audio/ui/select_001.ogg",
+        "duration": 0.043
+      },
+      {
+        "id": "sfx_ui_080",
+        "category": "ui",
+        "path": "assets/audio/ui/select_002.ogg",
+        "duration": 0.043
+      },
+      {
+        "id": "sfx_ui_081",
+        "category": "ui",
+        "path": "assets/audio/ui/select_003.ogg",
+        "duration": 0.383
+      },
+      {
+        "id": "sfx_ui_082",
+        "category": "ui",
+        "path": "assets/audio/ui/select_004.ogg",
+        "duration": 0.383
+      },
+      {
+        "id": "sfx_ui_083",
+        "category": "ui",
+        "path": "assets/audio/ui/select_005.ogg",
+        "duration": 0.383
+      },
+      {
+        "id": "sfx_ui_084",
+        "category": "ui",
+        "path": "assets/audio/ui/select_006.ogg",
+        "duration": 1.944
+      },
+      {
+        "id": "sfx_ui_085",
+        "category": "ui",
+        "path": "assets/audio/ui/select_007.ogg",
+        "duration": 0.047
+      },
+      {
+        "id": "sfx_ui_086",
+        "category": "ui",
+        "path": "assets/audio/ui/select_008.ogg",
+        "duration": 0.047
+      },
+      {
+        "id": "sfx_ui_087",
+        "category": "ui",
+        "path": "assets/audio/ui/switch_001.ogg",
+        "duration": 0.618
+      },
+      {
+        "id": "sfx_ui_088",
+        "category": "ui",
+        "path": "assets/audio/ui/switch_002.ogg",
+        "duration": 0.611
+      },
+      {
+        "id": "sfx_ui_089",
+        "category": "ui",
+        "path": "assets/audio/ui/switch_003.ogg",
+        "duration": 0.5
+      },
+      {
+        "id": "sfx_ui_090",
+        "category": "ui",
+        "path": "assets/audio/ui/switch_004.ogg",
+        "duration": 0.5
+      },
+      {
+        "id": "sfx_ui_091",
+        "category": "ui",
+        "path": "assets/audio/ui/switch_005.ogg",
+        "duration": 0.612
+      },
+      {
+        "id": "sfx_ui_092",
+        "category": "ui",
+        "path": "assets/audio/ui/switch_006.ogg",
+        "duration": 0.611
+      },
+      {
+        "id": "sfx_ui_093",
+        "category": "ui",
+        "path": "assets/audio/ui/switch_007.ogg",
+        "duration": 0.614
+      },
+      {
+        "id": "sfx_ui_094",
+        "category": "ui",
+        "path": "assets/audio/ui/tick_001.ogg",
+        "duration": 0.023
+      },
+      {
+        "id": "sfx_ui_095",
+        "category": "ui",
+        "path": "assets/audio/ui/tick_002.ogg",
+        "duration": 0.023
+      },
+      {
+        "id": "sfx_ui_096",
+        "category": "ui",
+        "path": "assets/audio/ui/tick_004.ogg",
+        "duration": 0.055
+      },
+      {
+        "id": "sfx_ui_097",
+        "category": "ui",
+        "path": "assets/audio/ui/toggle_001.ogg",
+        "duration": 0.139
+      },
+      {
+        "id": "sfx_ui_098",
+        "category": "ui",
+        "path": "assets/audio/ui/toggle_002.ogg",
+        "duration": 0.139
+      },
+      {
+        "id": "sfx_ui_099",
+        "category": "ui",
+        "path": "assets/audio/ui/toggle_003.ogg",
+        "duration": 0.139
+      },
+      {
+        "id": "sfx_ui_100",
+        "category": "ui",
+        "path": "assets/audio/ui/toggle_004.ogg",
+        "duration": 0.066
+      },
+      {
+        "id": "sfx_whoosh_001",
+        "category": "whoosh",
+        "path": "assets/audio/whoosh/swish_01.wav",
+        "duration": 0.3
+      },
+      {
+        "id": "sfx_whoosh_002",
+        "category": "whoosh",
+        "path": "assets/audio/whoosh/whoosh_long_01.wav",
+        "duration": 0.9
+      },
+      {
+        "id": "sfx_whoosh_003",
+        "category": "whoosh",
+        "path": "assets/audio/whoosh/whoosh_short_01.wav",
+        "duration": 0.45
+      },
+      {
+        "id": "sfx_wood_001",
+        "category": "wood",
+        "path": "assets/audio/wood/impactPlank_medium_000.ogg",
+        "duration": 0.779
+      },
+      {
+        "id": "sfx_wood_002",
+        "category": "wood",
+        "path": "assets/audio/wood/impactPlank_medium_001.ogg",
+        "duration": 0.779
+      },
+      {
+        "id": "sfx_wood_003",
+        "category": "wood",
+        "path": "assets/audio/wood/impactPlank_medium_002.ogg",
+        "duration": 0.779
+      },
+      {
+        "id": "sfx_wood_004",
+        "category": "wood",
+        "path": "assets/audio/wood/impactPlank_medium_003.ogg",
+        "duration": 0.779
+      },
+      {
+        "id": "sfx_wood_005",
+        "category": "wood",
+        "path": "assets/audio/wood/impactPlank_medium_004.ogg",
+        "duration": 0.779
+      },
+      {
+        "id": "sfx_wood_006",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_heavy_000.ogg",
+        "duration": 0.313
+      },
+      {
+        "id": "sfx_wood_007",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_heavy_001.ogg",
+        "duration": 0.313
+      },
+      {
+        "id": "sfx_wood_008",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_heavy_002.ogg",
+        "duration": 0.313
+      },
+      {
+        "id": "sfx_wood_009",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_heavy_003.ogg",
+        "duration": 0.313
+      },
+      {
+        "id": "sfx_wood_010",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_heavy_004.ogg",
+        "duration": 0.313
+      },
+      {
+        "id": "sfx_wood_011",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_light_000.ogg",
+        "duration": 0.266
+      },
+      {
+        "id": "sfx_wood_012",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_light_001.ogg",
+        "duration": 0.266
+      },
+      {
+        "id": "sfx_wood_013",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_light_002.ogg",
+        "duration": 0.266
+      },
+      {
+        "id": "sfx_wood_014",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_light_003.ogg",
+        "duration": 0.266
+      },
+      {
+        "id": "sfx_wood_015",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_light_004.ogg",
+        "duration": 0.266
+      },
+      {
+        "id": "sfx_wood_016",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_medium_000.ogg",
+        "duration": 0.333
+      },
+      {
+        "id": "sfx_wood_017",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_medium_001.ogg",
+        "duration": 0.333
+      },
+      {
+        "id": "sfx_wood_018",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_medium_002.ogg",
+        "duration": 0.333
+      },
+      {
+        "id": "sfx_wood_019",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_medium_003.ogg",
+        "duration": 0.333
+      },
+      {
+        "id": "sfx_wood_020",
+        "category": "wood",
+        "path": "assets/audio/wood/impactWood_medium_004.ogg",
+        "duration": 0.333
+      }
+    ],
+    "count_by_category": {
+      "bgm": 1,
+      "tts": 1,
+      "boom": 2,
+      "impact": 41,
+      "whoosh": 3,
+      "riser": 2,
+      "glass": 15,
+      "metal": 20,
+      "wood": 20,
+      "footstep": 25,
+      "ui": 100,
+      "soft": 10,
+      "imported": 0
+    },
+    "missing_files": [],
+    "element_shape": {
+      "id": "audio_001",
+      "type": "audio",
+      "track": "A3",
+      "asset": "<asset id>",
+      "start": 0.0,
+      "duration": 0.6,
+      "source": {
+        "start": 0.0,
+        "end": 0.6
+      },
+      "volume": 0.8,
+      "fade": {
+        "in": 0.05,
+        "out": 0.1
+      }
+    }
+  },
+  "resolutions": {
+    "default_aspect": "3:4",
+    "default_resolution": [
+      810,
+      1080
+    ],
+    "aspects": [
+      {
+        "id": "3:4",
+        "label": "3:4 竖版（横屏内容裁竖）",
+        "ratio": [
+          3,
+          4
+        ],
+        "resolutions": [
+          [
+            810,
+            1080
+          ],
+          [
+            1080,
+            1440
+          ],
+          [
+            1440,
+            1920
+          ]
+        ]
+      },
+      {
+        "id": "9:16",
+        "label": "9:16 全屏竖版（抖音 / 视频号）",
+        "ratio": [
+          9,
+          16
+        ],
+        "resolutions": [
+          [
+            720,
+            1280
+          ],
+          [
+            1080,
+            1920
+          ],
+          [
+            1440,
+            2560
+          ]
+        ]
+      }
+    ]
+  },
+  "markers": {
+    "location": "meta.markers",
+    "note": "兼容扩展：Remotion 忽略；为空时不写该字段",
+    "types": {
+      "normal": {
+        "label": "普通",
+        "color": "#8fa3bf"
+      },
+      "highlight": {
+        "label": "高潮",
+        "color": "#ff6b6b"
+      },
+      "transition": {
+        "label": "转场",
+        "color": "#4fd1c5"
+      },
+      "caption": {
+        "label": "字幕",
+        "color": "#ffe347"
+      },
+      "sfx": {
+        "label": "音效",
+        "color": "#b794f4"
+      },
+      "ai_highlight": {
+        "label": "AI 精彩点",
+        "color": "#f6ad55"
+      }
+    }
+  },
+  "docs": {
+    "effects": "docs/EFFECT_CATALOG.md",
+    "transitions": "docs/TRANSITION_CATALOG.md",
+    "sound_effects": "docs/SOUND_EFFECT_CATALOG.md",
+    "resolutions": "docs/RESOLUTION_GUIDE.md",
+    "gui": "docs/TIMELINE_GUI_GUIDE.md",
+    "json_examples": "docs/TIMELINE_JSON_EXAMPLES.md"
+  }
+}

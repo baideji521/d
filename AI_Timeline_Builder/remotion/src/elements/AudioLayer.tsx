@@ -3,27 +3,30 @@
  *
  * fade.in / fade.out 通过 volume 回调实现，回调收到的是相对本 Sequence 的帧号。
  * source.start 换算成 trimBefore，速度用 playbackRate。
+ * 最终音量 = 元素 volume × fade 系数 × meta.master_volume。
  */
 
 import React from "react";
 import { Audio, useVideoConfig } from "remotion";
 import { assetUrl } from "../lib/assets";
-import type { AssetManifest, TimelineElement } from "../lib/timeline";
-import { toFrames } from "../lib/timeline";
+import type { AssetManifest, Timeline, TimelineElement } from "../lib/timeline";
+import { masterVolume, resolveVolume, toFrames } from "../lib/timeline";
 
 type Props = {
   element: TimelineElement;
   manifest: AssetManifest;
+  timeline: Timeline;
 };
 
-export const AudioLayer: React.FC<Props> = ({ element, manifest }) => {
+export const AudioLayer: React.FC<Props> = ({ element, manifest, timeline }) => {
   const { fps } = useVideoConfig();
   const url = assetUrl(manifest, element.asset);
   if (!url) {
     return null;
   }
 
-  const baseVolume = element.volume ?? 1;
+  const master = masterVolume(timeline);
+  const baseVolume = resolveVolume(element.volume ?? 1, master);
   const fadeIn = element.fade?.in ?? 0;
   const fadeOut = element.fade?.out ?? 0;
   const totalFrames = Math.max(1, toFrames(element.duration ?? 0, fps));

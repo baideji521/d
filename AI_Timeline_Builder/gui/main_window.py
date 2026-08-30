@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtGui import QFont, QKeySequence
@@ -44,10 +44,15 @@ from PyQt5.QtWidgets import (
 )
 
 from core import demo_project
+from core import markers as marker_utils
 from core import timeline as tl
 from core import tts
 from core.asset_manager import IMPORT_FILE_FILTER
 from gui.asset_panel import AssetPanel
+from gui.asset_placement import choose_track as choose_placement_track
+from gui.asset_placement import for_asset as placement_for_asset
+from gui.asset_placement import for_element_type as placement_for_element_type
+
 from gui.dialogs import (
     CaseBrowserDialog,
     JianyingImportDialog,
@@ -260,6 +265,24 @@ class MainWindow(QMainWindow):
         template_menu = bar.addMenu("模板(&M)")
         self._add_action(template_menu, "在播放头展开模板…", lambda: self._quick_add_from_library("template"))
 
+        # ---- 标记
+        marker_menu = bar.addMenu("标记(&K)")
+        self._add_action(marker_menu, "在播放头打标记", self._on_add_marker, "add_marker")
+        for marker_type, spec in marker_utils.MARKER_TYPES.items():
+            if marker_type == marker_utils.DEFAULT_TYPE:
+                continue
+            self._add_action(
+                marker_menu,
+                f'打{spec["label"]}标记',
+                lambda t=marker_type: self._on_add_marker(t),
+            )
+        marker_menu.addSeparator()
+        self._add_action(marker_menu, "删除播放头附近的标记", self._on_remove_marker, "remove_marker")
+        self._add_action(marker_menu, "清空全部标记", self._model.clear_markers)
+        marker_menu.addSeparator()
+        self._add_action(marker_menu, "上一个标记", lambda: self._jump_marker(-1), "prev_marker")
+        self._add_action(marker_menu, "下一个标记", lambda: self._jump_marker(1), "next_marker")
+
         # ---- 实验
         case_menu = bar.addMenu("实验(&X)")
         self._add_action(case_menu, "保存为实验案例…", self._on_save_case)
@@ -348,6 +371,10 @@ class MainWindow(QMainWindow):
             ("goto_end", self._goto_end),
             ("select_up", lambda: self._select_vertical(1)),
             ("select_down", lambda: self._select_vertical(-1)),
+            ("add_marker", self._on_add_marker),
+            ("remove_marker", self._on_remove_marker),
+            ("prev_marker", lambda: self._jump_marker(-1)),
+            ("next_marker", lambda: self._jump_marker(1)),
         ]
         self._shortcut_objects: List[QShortcut] = []
         for action_key, slot in bindings:
@@ -419,6 +446,9 @@ class MainWindow(QMainWindow):
 
         self.timeline.itemDropped.connect(self._on_item_dropped)
         self.timeline.filesDropped.connect(self._on_files_dropped_on_timeline)
+        self.timeline.statusMessage.connect(self.log)
+        # ghost clip 要按真实时长画，所以把"payload → (元素类型, 时长, 显示名)"注入给画布
+        self.timeline.set_drop_info_provider(self._drop_info_for_payload)
 
         self.timeline.elementDoubleClicked.connect(self._on_element_double_clicked)
         self.timeline.elementContextRequested.connect(self._on_element_context)
@@ -469,6 +499,49 @@ class MainWindow(QMainWindow):
 
     # ================================================================ 拖放落地
 
+    def _drop_info_for_payload(self, payload: Dict[str, Any]) -> Tuple[str, float, str]:
+        """拖放预览信息：(元素类型, 时长秒, 显示名)。
+
+        元素类型决定 ghost 能不能落进目标轨道；返回 `""` 表示**不做轨道限制**——
+        动画 / 模板 / 转场 / 字幕模板的落地逻辑自己会挑元素或轨道
+        （见 _apply_animation / _expand_template / _insert_transition / _apply_caption_template），
+        在这里拦住反而会砍掉原有功能。
+        """
+        kind = str(payload.get("kind", ""))
+        item_id = str(payload.get("id", ""))
+        if kind == "asset":
+            asset = self._assets.get(item_id) or {}
+            duration = float(asset.get("duration") or 0.0)
+            asset_type = str(asset.get("type", ""))
+            if asset_type == "audio":
+                return ("audio", duration if duration > 0 else 3.0, self._assets.name_of(item_id))
+            if asset_type == "video":
+                return ("video", duration if duration > 0 else 3.0, self._assets.name_of(item_id))
+            if asset_type == "overlay" and duration > 0:
+                return ("video", duration, self._assets.name_of(item_id))
+            if asset_type in ("image", "overlay"):
+                return ("overlay", 2.0, self._assets.name_of(item_id))
+            return ("", 2.0, self._assets.name_of(item_id))
+        if kind == "effect":
+            effect = self._libraries.effect.get(item_id) or {}
+            return (
+                "effect",
+                float(effect.get("default_duration", 0.5)),
+                str(effect.get("label", item_id)),
+            )
+        if kind == "effect_material":
+            effect = self._libraries.effect.get(item_id) or {}
+            return (
+                "overlay",
+                float(effect.get("default_duration", 1.0)),
+                str(effect.get("label", item_id)),
+            )
+        if kind == "transition":
+            return ("", self._libraries.transition.default_duration(item_id), item_id)
+        if kind == "caption":
+            return ("", 1.6, item_id)
+        return ("", 1.0, item_id)
+
     def _on_item_dropped(self, payload: Dict[str, Any], track_id: str, time_seconds: float) -> None:
         """时间线接到一次拖放。payload 的 kind 决定生成什么元素。"""
         kind = payload.get("kind", "")
@@ -493,40 +566,66 @@ class MainWindow(QMainWindow):
             self.log(f"未识别的拖放类型：{kind}")
 
     def _add_asset_element(self, asset_id: str, track_id: str, start: float) -> None:
+        """把素材建成元素落到时间线。
+
+        轨道怎么定，全部交给 gui/asset_placement.py：
+        - track_id 传空（菜单 / 双击路径）→ 按素材角色选默认轨，被占就顺延
+        - track_id 有值（鼠标就悬在那条轨上）→ 尊重用户，只在 kind 不匹配时拒绝
+
+        拒绝时必须说清楚「该放哪」，不能静默失败。
+        """
         asset = self._assets.get(asset_id)
         if not asset:
             self.log(f"素材 {asset_id} 不在索引里")
             return
-        track = self._model.track(track_id) or {}
-        kind = track.get("kind", "video")
-        asset_type = asset.get("type", "")
+
+        placement = placement_for_asset(asset)
         duration = float(asset.get("duration") or 0.0)
+        # 先按素材本身的时长估一个占位长度，用于「这段时间被占了没有」的判断
+        span = duration if duration > 0 else (2.0 if placement.element_type == "overlay" else 3.0)
+
+        if track_id:
+            track = self._model.track(track_id) or {}
+            kind = str(track.get("kind") or "")
+            if kind != placement.track_kind:
+                self.log(
+                    f"{placement.label}素材要放到 {placement.track_kind} 轨，"
+                    f"{track_id} 是 {kind or '未知'} 轨；默认位置是 {placement.default_track}"
+                )
+                return
+            if track.get("locked"):
+                self.log(f"{track_id} 已锁定，先解锁再放素材")
+                return
+
+        target_track, reason = choose_placement_track(
+            placement, self._model.tracks(), self._model.elements(), start, span,
+            requested_track=track_id,
+        )
+        if not track_id and reason:
+            self.log(reason)
+
+        asset_type = asset.get("type", "")
         element_id = self._model.new_element_id("video")
 
-        if asset_type == "audio":
-            if kind != "audio":
-                self.log(f"音频素材只能放到音频轨，{track_id} 是 {kind} 轨")
-                return
+        if placement.element_type == "audio":
             length = duration if duration > 0 else 3.0
             element = tl.make_audio(
-                self._model.new_element_id("audio"), asset_id, track_id, start, round(length, 3)
+                self._model.new_element_id("audio"), asset_id, target_track, start, round(length, 3)
             )
-        elif asset_type in ("video",):
+        elif asset_type == "video" or (asset_type == "overlay" and duration > 0):
+            # 带时长的透明视频也当视频叠加处理，保留 source 区间
             source_end = duration if duration > 0 else 3.0
-            element = tl.make_video(element_id, asset_id, track_id, start, 0.0, round(source_end, 3))
+            element = tl.make_video(element_id, asset_id, target_track, start, 0.0, round(source_end, 3))
         elif asset_type in ("image", "overlay"):
-            if asset_type == "overlay" and duration > 0:
-                # 带时长的透明视频当视频叠加处理，保留 source 区间
-                element = tl.make_video(element_id, asset_id, track_id, start, 0.0, round(duration, 3))
-            else:
-                element = tl.make_overlay(
-                    self._model.new_element_id("overlay"), asset_id, track_id, start, 2.0
-                )
+            element = tl.make_overlay(
+                self._model.new_element_id("overlay"), asset_id, target_track, start, 2.0
+            )
         else:
             self.log(f"素材类型 {asset_type} 不能直接放到时间线")
             return
 
         self._model.add_element(element, f"添加素材 {self._assets.name_of(asset_id)}")
+
 
     def _add_program_effect(self, name: str, track_id: str, start: float) -> None:
         effect = self._libraries.effect.get(name)
@@ -569,7 +668,9 @@ class MainWindow(QMainWindow):
             start,
             float(effect.get("default_duration", 1.0)),
         )
-        element["effect_name"] = name
+        # 素材特效的来路记在 label（schema 里声明过的字段），不要再写 effect_name ——
+        # 那个字段全仓库没人读，且 schema 没声明，属于会静默通过校验的死数据
+        element["label"] = str(effect.get("label", name))
         element["params"] = params
         self._model.add_element(element, f"添加素材特效 {effect.get('label', name)}")
 
@@ -741,16 +842,17 @@ class MainWindow(QMainWindow):
         self.timeline.refresh()
 
     def _track_for_asset(self, asset: Dict[str, Any], preferred: str) -> str:
-        """落点轨道类型和素材不匹配时，自动换到合适的轨道。"""
-        kind = (self._model.track(preferred) or {}).get("kind", "video")
-        asset_type = asset.get("type", "")
-        if asset_type == "audio":
-            return preferred if kind == "audio" else "A3"
-        if asset_type in ("video", "image", "overlay"):
-            if kind == "video":
-                return preferred
-            return "V1" if asset_type == "video" else "V3"
-        return preferred
+        """落点轨道类型和素材不匹配时，换到策略给的默认轨。
+
+        规则不在这里，在 gui/asset_placement.py —— 这里只做「合法就尊重用户，
+        不合法就回落到策略默认轨」这一步转换。
+        """
+        placement = placement_for_asset(asset)
+        kind = (self._model.track(preferred) or {}).get("kind", "")
+        if kind == placement.track_kind:
+            return preferred
+        return placement.default_track
+
 
     # ================================================================ 文本转语音
 
@@ -1002,10 +1104,10 @@ class MainWindow(QMainWindow):
         asset = self._assets.get(asset_id)
         if not asset:
             return
-        track = {"video": "V1", "image": "V3", "overlay": "V3", "audio": "A3"}.get(
-            asset.get("type", ""), "V1"
-        )
-        self._add_asset_element(asset_id, track, self._model.playhead)
+        # 落位规则只有一份：gui/asset_placement.py。
+        # 这里不再自己写「视频 V1、音频 A3」，音乐/人声/音效也能各归各轨。
+        self._add_asset_element(asset_id, "", self._model.playhead)
+
 
     def _on_add_selected_asset(self) -> None:
         asset_id = self.asset_panel.current_asset_id()
@@ -1015,16 +1117,21 @@ class MainWindow(QMainWindow):
             self.log("请先在素材库里选一个素材")
 
     def _on_library_item_activated(self, payload: Dict[str, Any]) -> None:
-        """库面板双击：等价于拖到播放头位置。"""
+        """库面板双击：等价于拖到播放头位置。
+
+        字幕 / 素材特效走统一落位策略；特效 / 转场 / 动画 / 模板依附在宿主元素上，
+        轨道由宿主决定，这里只给一个进入点 V1。
+        """
         kind = payload.get("kind", "")
-        default_track = {
-            "effect": "V1",
-            "effect_material": "V3",
-            "transition": "V1",
-            "caption": "T1",
-            "animation": "V1",
-            "template": "V1",
-        }.get(kind, "V1")
+        if kind == "asset":
+            # 音效库双击：轨道交给落位策略（BGM→A1 / 人声→A2 / 音效→A3）
+            default_track = ""
+        elif kind == "caption":
+            default_track = placement_for_element_type("caption").default_track
+        elif kind == "effect_material":
+            default_track = placement_for_element_type("overlay").default_track
+        else:
+            default_track = "V1"
         self._on_item_dropped(payload, default_track, self._model.playhead)
 
     def _on_json_loaded(self, data: Dict[str, Any]) -> None:
@@ -1333,6 +1440,28 @@ class MainWindow(QMainWindow):
     def _goto_end(self) -> None:
         self._model.set_playhead(self._model.duration)
 
+    # ------------------------------------------------------------ 标记
+
+    def _on_add_marker(self, marker_type: str = marker_utils.DEFAULT_TYPE) -> None:
+        """在播放头处打标记。标记只写进 meta.markers，不产生任何渲染元素。"""
+        self._model.add_marker(float(self._model.playhead), marker_type)
+
+    def _on_remove_marker(self) -> None:
+        """删掉播放头附近的标记。容差在 core/markers.py 里统一定义。"""
+        self._model.remove_marker_at(float(self._model.playhead))
+
+    def _jump_marker(self, direction: int) -> None:
+        """跳到上/下一个标记。没有就原地不动，不要绕回去让人迷路。"""
+        marker = marker_utils.nearest_marker(
+            self._model.timeline, float(self._model.playhead), direction
+        )
+        if marker is None:
+            self.log("这个方向没有标记了")
+            return
+        self.preview.stop()
+        self._model.set_playhead(float(marker["time"]))
+
+
     def _nudge_selection(self, frames: int) -> None:
         """选中元素整体左右各挪一帧，用来对齐音画。"""
         selection = self._model.selection()
@@ -1471,13 +1600,14 @@ class MainWindow(QMainWindow):
         """从菜单快速添加库项目：弹一个选择列表。"""
         if kind == "effect":
             items = [(e["name"], e.get("label", e["name"])) for e in self._libraries.effect.program_effects()]
-            track = "V1"
+            track = "V1"   # 程序特效依附宿主元素，V1 只是进入点
         elif kind == "effect_material":
             items = [(e["name"], e.get("label", e["name"])) for e in self._libraries.effect.material_effects()]
-            track = "V3"
+            track = placement_for_element_type("overlay").default_track
         elif kind == "template":
             items = [(t["id"], t.get("name", t["id"])) for t in self._libraries.template.all()]
             track = "V1"
+
         else:
             return
         if not items:
@@ -1536,7 +1666,7 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def _on_save_project(self) -> None:
-        target = self._projects.save(self._model.timeline, self._assets.manifest_dict())
+        target = self._projects.save(self._model.to_dict(), self._assets.manifest_dict())
         self.log(f"项目已保存：{target}")
         self._update_status()
 
@@ -1547,7 +1677,7 @@ class MainWindow(QMainWindow):
         if not ok or not name.strip():
             return
         target = os.path.join(self._projects.projects_dir, name.strip())
-        self._projects.save(self._model.timeline, self._assets.manifest_dict(), target)
+        self._projects.save(self._model.to_dict(), self._assets.manifest_dict(), target)
         self.log(f"项目已另存为：{target}")
         self._update_status()
 
@@ -1575,7 +1705,7 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
-        self._projects.save_timeline_only(self._model.timeline, path)
+        self._projects.save_timeline_only(self._model.to_dict(), path)
         self.log(f"Timeline JSON 已导出：{path}")
 
     def _on_project_settings(self) -> None:
@@ -1620,7 +1750,7 @@ class MainWindow(QMainWindow):
             "name": dialog.case_name(),
             "note": dialog.case_note(),
             "focus_element": element_id,
-            "timeline": self._model.timeline,
+            "timeline": self._model.to_dict(),
         }
         path = self._projects.save_case(dialog.case_name(), payload)
         self.log(f"实验案例已保存：{path}")
@@ -1653,7 +1783,7 @@ class MainWindow(QMainWindow):
             )
             if answer != QMessageBox.Yes:
                 return None
-        result = self._exporter.export(self._model.timeline)
+        result = self._exporter.export(self._model.to_dict())
         self.log(
             f"已导出到 Remotion 工程：{result['remotion_dir']}　"
             f"素材 {result['asset_count']} 个（复制 {result['copied']} 个）"

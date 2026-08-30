@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "scanned_at": "2026-08-30 11:59:21",
+  "scanned_at": "2026-08-30 22:02:45",
   "id_history": {
     "assets/audio/bgm/bgm_demo.wav": "sfx_bgm_001",
     "assets/audio/boom/boom_low_01.wav": "sfx_boom_001",
@@ -255,7 +255,8 @@
     "assets/transitions/streak/speed_lines.webm": "overlay_streak_001",
     "assets/videos/demo/demo_a.mp4": "video_001",
     "assets/videos/demo/demo_b.mp4": "video_002",
-    "assets/videos/imported/202608261927_tiktok_7677962144964463894_20260826_202153.mp4": "video_003"
+    "assets/videos/imported/202608261927_tiktok_7677962144964463894_20260826_202153.mp4": "video_003",
+    "assets/videos/imported/demo.mp4": "video_004"
   },
   "assets": [
     {
@@ -4042,6 +4043,25 @@
         "imported"
       ],
       "thumbnail": ".cache/thumbs/assets_videos_imported_202608261927_tiktok_7677962144964463894_20260826_202153_mp4.png",
+      "type": "video",
+      "width": 810
+    },
+    {
+      "category": "imported",
+      "duration": 58.771,
+      "fps": 30.0,
+      "has_alpha": false,
+      "has_audio": true,
+      "height": 1080,
+      "id": "video_004",
+      "name": "demo",
+      "path": "assets/videos/imported/demo.mp4",
+      "size_bytes": 65323718,
+      "tags": [
+        "videos",
+        "imported"
+      ],
+      "thumbnail": ".cache/thumbs/assets_videos_imported_demo_mp4.png",
       "type": "video",
       "width": 810
     }

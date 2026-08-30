@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
 from typing import Any, Dict, List, Optional
 
 # Windows 下隐藏黑色控制台窗口
@@ -59,6 +60,10 @@ class FFmpeg:
     def __init__(self) -> None:
         self.ffmpeg_path = _find_binary("ffmpeg")
         self.ffprobe_path = _find_binary("ffprobe")
+        #: 正在跑的子进程。退出程序时要能立刻把它杀掉，见 cancel()
+        self._lock = threading.Lock()
+        self._live: Optional[subprocess.Popen] = None
+        self._cancelled = False
 
     @property
     def available(self) -> bool:
@@ -68,6 +73,61 @@ class FFmpeg:
         if self.available:
             return f"FFmpeg 就绪：{self.ffmpeg_path}"
         return "未找到 FFmpeg，素材时长/分辨率探测与画面预览不可用（请安装 FFmpeg 并加入 PATH）"
+
+    # ------------------------------------------------------------ 子进程
+
+    def _run(self, command: List[str], timeout: float) -> Optional[subprocess.CompletedProcess]:
+        """跑一个 ffmpeg / ffprobe 子进程；失败或被取消时返回 None。
+
+        用 Popen 而不是 subprocess.run，是为了**留一个能被杀掉的句柄**。
+        否则关闭程序时后台抽帧线程会卡在最长 60 秒的 ffmpeg 调用里，
+        主线程等不到它结束，Qt 只能去销毁一个仍在运行的 QThread ——
+        那是进程级 fastfail（0xC0000409），用户看到的就是「什么都没动，自己崩了」。
+        """
+        with self._lock:
+            if self._cancelled:
+                return None
+            try:
+                process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    creationflags=_CREATE_NO_WINDOW,
+                )
+            except OSError:
+                return None
+            self._live = process
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            try:
+                process.communicate(timeout=5)
+            except (subprocess.SubprocessError, OSError, ValueError):
+                pass
+            return None
+        except (subprocess.SubprocessError, OSError, ValueError):
+            return None
+        finally:
+            with self._lock:
+                if self._live is process:
+                    self._live = None
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+    def cancel(self) -> None:
+        """要退出了：不再启新子进程，并把正在跑的那个立刻杀掉。
+
+        幂等，可以从任意线程调用（关闭窗口时是主线程调，抽帧在后台线程里跑）。
+        """
+        with self._lock:
+            self._cancelled = True
+            process = self._live
+        if process is not None and process.poll() is None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
 
     # ------------------------------------------------------------ 探测
 
@@ -86,13 +146,8 @@ class FFmpeg:
             path,
         ]
         try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                timeout=30,
-                creationflags=_CREATE_NO_WINDOW,
-            )
-            if result.returncode != 0:
+            result = self._run(command, timeout=30)
+            if result is None or result.returncode != 0:
                 return {}
             data = json.loads(result.stdout.decode("utf-8", errors="replace"))
         except (subprocess.SubprocessError, json.JSONDecodeError, OSError):
@@ -178,14 +233,8 @@ class FFmpeg:
         if width > 0:
             command += ["-vf", f"scale={int(width)}:-2:flags=fast_bilinear"]
         command += ["-f", "image2", output_path]
-        try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                timeout=30,
-                creationflags=_CREATE_NO_WINDOW,
-            )
-        except (subprocess.SubprocessError, OSError):
+        result = self._run(command, timeout=30)
+        if result is None:
             return False
         return result.returncode == 0 and os.path.isfile(output_path)
 
@@ -238,15 +287,10 @@ class FFmpeg:
             pattern,
         ]
         try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                timeout=60,
-                creationflags=_CREATE_NO_WINDOW,
-            )
+            result = self._run(command, timeout=60)
         except (subprocess.SubprocessError, OSError):
             return []
-        if result.returncode != 0:
+        if result is None or result.returncode != 0:
             return []
         files = sorted(
             os.path.join(output_dir, name)
@@ -275,13 +319,10 @@ class FFmpeg:
             output_path,
         ]
         try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                timeout=60,
-                creationflags=_CREATE_NO_WINDOW,
-            )
+            result = self._run(command, timeout=60)
         except (subprocess.SubprocessError, OSError):
+            return False
+        if result is None:
             return False
         return result.returncode == 0 and os.path.isfile(output_path)
 

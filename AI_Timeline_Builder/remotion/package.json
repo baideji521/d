@@ -7,7 +7,9 @@
   "scripts": {
     "studio": "remotion studio",
     "render": "node render.mjs",
-    "build": "remotion bundle"
+    "build": "remotion bundle",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/lib/timeline.test.ts src/effects/registry.test.ts src/transitions/registry.test.ts"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.518",

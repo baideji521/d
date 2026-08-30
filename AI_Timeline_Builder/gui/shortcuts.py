@@ -36,6 +36,11 @@ KEYS: Dict[str, List[str]] = {
     "select_down": ["Down"],
     "nudge_left": ["Alt+Left"],
     "nudge_right": ["Alt+Right"],
+    # 标记（剪映用 M 打点，这里保持一致）
+    "add_marker": ["M"],
+    "remove_marker": ["Shift+M"],
+    "prev_marker": ["Ctrl+Left"],
+    "next_marker": ["Ctrl+Right"],
     # 视图
     "zoom_in": ["Ctrl+=", "Ctrl++"],
     "zoom_out": ["Ctrl+-"],
@@ -78,6 +83,10 @@ LABELS: Dict[str, str] = {
     "select_down": "选下一条轨道上同时刻的元素",
     "nudge_left": "选中元素左移一帧",
     "nudge_right": "选中元素右移一帧",
+    "add_marker": "在播放头处打标记",
+    "remove_marker": "删除播放头附近的标记",
+    "prev_marker": "跳到上一个标记",
+    "next_marker": "跳到下一个标记",
     "zoom_in": "时间线放大",
     "zoom_out": "时间线缩小",
     "zoom_fit": "缩放到整条时间线",
@@ -126,6 +135,7 @@ GROUPS: List[Tuple[str, List[str]]] = [
         ],
     ),
     ("选择", ["select_all", "select_up", "select_down"]),
+    ("标记", ["add_marker", "remove_marker", "prev_marker", "next_marker"]),
     ("视图", ["zoom_in", "zoom_out", "zoom_fit", "toggle_snap", "cheatsheet"]),
     (
         "项目与素材",

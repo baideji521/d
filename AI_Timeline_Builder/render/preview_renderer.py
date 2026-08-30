@@ -123,7 +123,16 @@ class FrameWorker(QThread):
         self._done.clear()
 
     def stop(self) -> None:
+        """请求停机：清空队列并把正在跑的 ffmpeg 子进程杀掉。
+
+        只置标志是不够的 —— run() 可能正卡在一次最长 60 秒的抽帧调用里，
+        主线程等不到线程结束就会去销毁一个仍在运行的 QThread（进程级崩溃）。
+        """
         self._running = False
+        self._queue.clear()
+        self._pending.clear()
+        self._ffmpeg.cancel()
+
 
     def run(self) -> None:  # noqa: D102
         while self._running:
@@ -213,10 +222,26 @@ class PreviewRenderer(QObject):
         self._worker = FrameWorker(cache_dir, self)
         self._worker.frameDone.connect(self._on_frame_done)
         self._worker.start()
+        self._closed = False
+
 
     def shutdown(self) -> None:
+        """停掉抽帧线程。**任何退出路径都必须走到这里**，且可以重复调用。
+
+        Qt 一旦销毁「还在运行」的 QThread，就会直接 fastfail
+        （Windows 上表现为 0xC0000409，进程无声无息地消失）。
+        所以这里不只是置标志：先杀子进程，再等线程真的结束；
+        万一还没结束，宁可 terminate 也不能让它带着运行状态被销毁。
+        """
+        if self._closed:
+            return
+        self._closed = True
+        self._notify.stop()
         self._worker.stop()
-        self._worker.wait(1500)
+        if not self._worker.wait(5000):
+            self._worker.terminate()
+            self._worker.wait(2000)
+
 
     # ------------------------------------------------------------ 帧缓存
 

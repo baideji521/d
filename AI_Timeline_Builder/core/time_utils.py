@@ -41,7 +41,26 @@ def format_timecode(seconds: float, fps: float = DEFAULT_FPS) -> str:
     return f"{minutes:02d}:{rest:05.2f}"
 
 
+def format_timecode_long(seconds: float) -> str:
+    """格式化为 hh:mm:ss.mmm（毫秒），播放器时间码用。
+
+    专业播放器要能看清"到底是第几毫秒"，mm:ss.cc 的百分秒精度不够：
+    30fps 下一帧是 33.3ms，百分秒会把相邻两帧显示成同一个值。
+    """
+    seconds = max(0.0, float(seconds))
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    rest = seconds - hours * 3600 - minutes * 60
+    return f"{hours:02d}:{minutes:02d}:{rest:06.3f}"
+
+
+def frame_label(seconds: float, fps: float = DEFAULT_FPS) -> str:
+    """当前是第几帧（从 0 开始），播放器和验收报告都用它对齐帧级定位。"""
+    return f"#{seconds_to_frames(seconds, fps)}"
+
+
 def format_seconds(seconds: float) -> str:
+
     """属性面板展示用：保留两位小数并带单位。"""
     return f"{float(seconds):.2f}s"
 

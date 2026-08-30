@@ -16,7 +16,9 @@ from typing import Optional
 from PyQt5.QtCore import QElapsedTimer, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QImage, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QComboBox,
+
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -26,11 +28,20 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from core.time_utils import format_timecode
+from core import timeline as tl
+from core.time_utils import format_timecode_long, frame_label
+
+#: 安全区域比例（相对画布）。行业惯例：动作安全 93%，标题安全 90%。
+ACTION_SAFE = 0.93
+TITLE_SAFE = 0.90
 
 
 class PreviewCanvas(QWidget):
-    """画面显示区。负责等比居中，以及拖动改位置。"""
+    """画面显示区。负责等比居中，以及拖动改位置。
+
+    画布尺寸完全由 meta.width / meta.height 决定 —— 项目设置里换成 9:16，
+    这里的画面、安全区、鼠标归一化坐标会一起跟着变，不需要额外通知。
+    """
 
     positionDragged = pyqtSignal(float, float)  # 归一化 x, y
 
@@ -43,9 +54,18 @@ class PreviewCanvas(QWidget):
         self._render_size = QSize()
         self._render_scale = 1.0
         self._dragging = False
+        self._show_safe_area = False
         self.setMinimumSize(240, 320)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setMouseTracking(True)
+
+    def set_safe_area_visible(self, visible: bool) -> None:
+        self._show_safe_area = bool(visible)
+        self.update()
+
+    def safe_area_visible(self) -> bool:
+        return self._show_safe_area
+
 
     def set_render_scale(self, scale: float) -> None:
         """渲染倍率。小于 1 时先按小尺寸合成再放大显示，播放时省很多时间。"""
@@ -93,12 +113,17 @@ class PreviewCanvas(QWidget):
         painter.setPen(QPen(QColor("#2b3543")))
         painter.drawRect(self._target_rect.adjusted(0, 0, -1, -1))
 
-        # 选中元素画一个中心控制点，提示可以拖
+        if self._show_safe_area:
+            self._paint_safe_area(painter)
+
+
+        # 选中元素画一个中心控制点，提示可以拖。
+        # 按类型判断，不看 transform 字段在不在 —— 稀疏 JSON 里它常常不存在
         element = self._model.element(self._model.selected_id)
-        if element and isinstance(element.get("transform"), dict):
-            transform = element["transform"]
-            cx = self._target_rect.left() + float(transform.get("x", 0.5)) * self._target_rect.width()
-            cy = self._target_rect.top() + float(transform.get("y", 0.5)) * self._target_rect.height()
+        if element and tl.supports_transform(element):
+            transform = tl.effective_transform(element)
+            cx = self._target_rect.left() + float(transform["x"]) * self._target_rect.width()
+            cy = self._target_rect.top() + float(transform["y"]) * self._target_rect.height()
             painter.setPen(QPen(QColor("#ffe347"), 1, Qt.DashLine))
             painter.drawLine(int(cx) - 12, int(cy), int(cx) + 12, int(cy))
             painter.drawLine(int(cx), int(cy) - 12, int(cx), int(cy) + 12)
@@ -106,9 +131,37 @@ class PreviewCanvas(QWidget):
             painter.drawEllipse(QPoint(int(cx), int(cy)), 5, 5)
         painter.end()
 
+    def _paint_safe_area(self, painter: QPainter) -> None:
+        """画动作安全区与标题安全区。
+
+        比例是相对**画布**的，所以换成 3:4 或 9:16 都自动适配 ——
+        安全区跟着 _target_rect 走，而 _target_rect 由 meta.width/height 算出来。
+        """
+        rect = self._target_rect
+        for ratio, color, label in (
+            (ACTION_SAFE, QColor("#4fd1c5"), "动作安全 93%"),
+            (TITLE_SAFE, QColor("#f6ad55"), "标题安全 90%"),
+        ):
+            width = int(rect.width() * ratio)
+            height = int(rect.height() * ratio)
+            box = QRect(
+                rect.left() + (rect.width() - width) // 2,
+                rect.top() + (rect.height() - height) // 2,
+                width,
+                height,
+            )
+            pen = QPen(color, 1, Qt.DashLine)
+            painter.setPen(pen)
+            painter.drawRect(box)
+            painter.drawText(box.left() + 4, box.top() + 14, label)
+        # 画面中心十字，方便判断元素有没有居中
+        painter.setPen(QPen(QColor("#3b4657"), 1, Qt.DotLine))
+        painter.drawLine(rect.center().x(), rect.top(), rect.center().x(), rect.bottom())
+        painter.drawLine(rect.left(), rect.center().y(), rect.right(), rect.center().y())
+
     def mousePressEvent(self, event) -> None:  # noqa: N802
         element = self._model.element(self._model.selected_id)
-        if event.button() == Qt.LeftButton and element and isinstance(element.get("transform"), dict):
+        if event.button() == Qt.LeftButton and element and tl.supports_transform(element):
             self._dragging = True
             self._emit_position(event.pos())
 
@@ -143,12 +196,22 @@ class PreviewWidget(QWidget):
         self._play_origin = 0.0
 
 
-        self._info = QLabel("00:00.00 / 00:00.00")
+        self._info = QLabel("00:00:00.000 / 00:00:00.000")
         self._info.setStyleSheet("color:#9aa8bb; font-family: Consolas;")
 
         self._play_button = QPushButton("▶ 播放")
         self._play_button.setFixedWidth(74)
         self._play_button.clicked.connect(self.toggle_play)
+
+        home_button = QPushButton("⏮")
+        home_button.setFixedWidth(32)
+        home_button.setToolTip("跳到开始")
+        home_button.clicked.connect(self.go_start)
+
+        end_button = QPushButton("⏭")
+        end_button.setFixedWidth(32)
+        end_button.setToolTip("跳到结束（最后一帧）")
+        end_button.clicked.connect(self.go_end)
 
         prev_button = QPushButton("◀|")
         prev_button.setFixedWidth(36)
@@ -159,6 +222,25 @@ class PreviewWidget(QWidget):
         next_button.setFixedWidth(36)
         next_button.setToolTip("下一帧")
         next_button.clicked.connect(lambda: self._step(1))
+
+        self._safe_area = QCheckBox("安全区")
+        self._safe_area.setToolTip("显示动作安全区 93% / 标题安全区 90%，按当前画面比例适配")
+        self._safe_area.toggled.connect(self.canvas.set_safe_area_visible)
+
+        # 预览没有音频通路（本工程不做音频解码播放），所以这里控制的是
+        # **导出音量** meta.master_volume —— 影响渲染出的 MP4，不影响预览。
+        # 名字必须写清楚，否则用户会以为是预览音量而误以为坏了。
+        self._mute_button = QPushButton("🔊")
+        self._mute_button.setFixedWidth(32)
+        self._mute_button.setToolTip("导出静音开关（meta.master_volume=0），预览本身无声")
+        self._mute_button.clicked.connect(self.toggle_mute)
+
+        self._volume = QSlider(Qt.Horizontal)
+        self._volume.setFixedWidth(90)
+        self._volume.setRange(0, 200)
+        self._volume.setValue(100)
+        self._volume.setToolTip("导出音量 meta.master_volume（0~200%），预览无声")
+        self._volume.sliderReleased.connect(self._commit_volume)
 
         self._quality = QComboBox()
         self._quality.addItems(["预览质量 流畅", "预览质量 标准", "预览质量 高"])
@@ -174,17 +256,25 @@ class PreviewWidget(QWidget):
         controls = QHBoxLayout()
         controls.setContentsMargins(6, 4, 6, 4)
         controls.setSpacing(6)
+        controls.addWidget(home_button)
         controls.addWidget(prev_button)
         controls.addWidget(self._play_button)
         controls.addWidget(next_button)
+        controls.addWidget(end_button)
         controls.addWidget(self._scrub, 1)
         controls.addWidget(self._info)
+        controls.addWidget(self._mute_button)
+        controls.addWidget(self._volume)
+        controls.addWidget(self._safe_area)
         controls.addWidget(self._quality)
 
         # 控件不接受键盘焦点，否则空格 / 方向键会被按钮和滑块吃掉，
         # 全局快捷键（空格播放、方向键帧步进）就失效了
-        for widget in (prev_button, self._play_button, next_button, self._scrub, self._quality):
+        for widget in (home_button, prev_button, self._play_button, next_button, end_button,
+                       self._scrub, self._quality, self._safe_area,
+                       self._mute_button, self._volume):
             widget.setFocusPolicy(Qt.NoFocus)
+
 
 
         layout = QVBoxLayout(self)
@@ -199,6 +289,9 @@ class PreviewWidget(QWidget):
         model.playheadChanged.connect(self._on_playhead_changed)
         renderer.frameReady.connect(self.canvas.invalidate)
         self.canvas.positionDragged.connect(self._on_position_dragged)
+
+        self._volume_before_mute = 1.0
+        self._sync_volume()
 
         self._update_info()
 
@@ -261,6 +354,52 @@ class PreviewWidget(QWidget):
         fps = max(1.0, self._model.fps)
         self._model.set_playhead(max(0.0, self._model.playhead + frames / fps))
 
+    def go_start(self) -> None:
+        """跳到开始。"""
+        self.stop()
+        self._model.set_playhead(0.0)
+
+    def go_end(self) -> None:
+        """跳到结束：落在**最后一帧**，而不是超出末尾的那个时刻。
+
+        时长 2.0s / 30fps 的片子共 60 帧，最后一帧在 1.966667s。
+        直接跳到 2.0s 会落在片子之外，画面是空的。
+        """
+        self.stop()
+        fps = max(1.0, self._model.fps)
+        duration = max(0.0, self._model.duration)
+        last = max(0.0, duration - 1.0 / fps)
+        self._model.set_playhead(round(round(last * fps) / fps, 6))
+
+    def safe_area_visible(self) -> bool:
+        return self._safe_area.isChecked()
+
+    def toggle_safe_area(self) -> None:
+        self._safe_area.setChecked(not self._safe_area.isChecked())
+
+    # ------------------------------------------------------------ 导出音量
+
+    def toggle_mute(self) -> None:
+        """导出静音开关。静音前记住原音量，取消静音时还原。"""
+        current = self._model.master_volume
+        if current > 0:
+            self._volume_before_mute = current
+            self._model.set_master_volume(0.0)
+        else:
+            self._model.set_master_volume(getattr(self, "_volume_before_mute", 1.0) or 1.0)
+        self._sync_volume()
+
+    def _commit_volume(self) -> None:
+        """滑块松手才写模型 —— 拖动过程中每帧提交会把撤销栈冲爆。"""
+        self._model.set_master_volume(self._volume.value() / 100.0)
+        self._sync_volume()
+
+    def _sync_volume(self) -> None:
+        volume = self._model.master_volume
+        if not self._volume.isSliderDown():
+            self._volume.setValue(int(round(volume * 100)))
+        self._mute_button.setText("🔇" if volume <= 0 else "🔊")
+
     def _on_scrub(self, value: int) -> None:
         duration = max(1e-6, self._model.duration)
         self._model.set_playhead(duration * value / 1000.0)
@@ -270,6 +409,7 @@ class PreviewWidget(QWidget):
     def _on_timeline_changed(self) -> None:
         self.canvas.invalidate()
         self._update_info()
+        self._sync_volume()
 
     def _on_playhead_changed(self, _seconds: float) -> None:
         self.canvas.invalidate()
@@ -277,9 +417,12 @@ class PreviewWidget(QWidget):
 
     def _update_info(self) -> None:
         duration = self._model.duration
+        fps = max(1.0, self._model.fps)
         self._info.setText(
-            f"{format_timecode(self._model.playhead)} / {format_timecode(duration)}"
+            f"{format_timecode_long(self._model.playhead)} / {format_timecode_long(duration)}"
+            f"  {frame_label(self._model.playhead, fps)}"
         )
+
         if duration > 0:
             ratio = int(self._model.playhead / duration * 1000)
             if not self._scrub.isSliderDown():

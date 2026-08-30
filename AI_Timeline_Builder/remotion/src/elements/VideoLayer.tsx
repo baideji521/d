@@ -9,7 +9,7 @@ import React from "react";
 import { Freeze, OffthreadVideo, useVideoConfig } from "remotion";
 import { assetUrl } from "../lib/assets";
 import type { AssetManifest, Geometry, Timeline, TimelineElement } from "../lib/timeline";
-import { findElement, geometryToStyle, toFrames } from "../lib/timeline";
+import { findElement, geometryToStyle, masterVolume, resolveVolume, toFrames } from "../lib/timeline";
 
 type Props = {
   element: TimelineElement;
@@ -63,6 +63,7 @@ export const VideoLayer: React.FC<Props> = ({
   const trimAfter = Math.max(trimBefore + 1, toFrames(source.end, fps));
   const audio = element.audio ?? {};
   const muted = audio.enabled === false;
+  const master = masterVolume(timeline);
 
   return (
     <div style={{ ...geometryToStyle(geometry), width: "100%", height: "100%" }}>
@@ -71,8 +72,8 @@ export const VideoLayer: React.FC<Props> = ({
         trimBefore={trimBefore}
         trimAfter={trimAfter}
         playbackRate={element.speed ?? 1}
-        muted={muted}
-        volume={muted ? 0 : audio.volume ?? 1}
+        muted={muted || master <= 0}
+        volume={muted ? 0 : resolveVolume(audio.volume ?? 1, master)}
         style={FILL}
       />
     </div>

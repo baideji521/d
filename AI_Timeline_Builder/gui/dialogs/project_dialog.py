@@ -18,20 +18,20 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-# 常见竖屏 / 横屏预设。分辨率与 fps 都会写进 timeline.meta，渲染端直接照用。
-RESOLUTION_PRESETS = [
-    ("竖屏 1080×1920（抖音/Reels）", 1080, 1920),
-    ("竖屏 720×1280", 720, 1280),
-    ("横屏 1920×1080", 1920, 1080),
-    ("横屏 1280×720", 1280, 720),
-    ("方形 1080×1080", 1080, 1080),
-]
+from core import resolution as res
 
 FPS_PRESETS = [24.0, 25.0, 30.0, 50.0, 60.0]
 
+#: 自定义比例在下拉里的占位 id
+CUSTOM_ASPECT = "custom"
+
 
 class ProjectSettingsDialog(QDialog):
-    """改项目名、fps、分辨率。
+    """改项目名、fps、画面比例与分辨率。
+
+    比例与分辨率**联动**：选 3:4 时分辨率下拉只出现 3:4 的档位。
+    档位表来自 core/resolution.py，那是全项目唯一的一份，
+    GUI / 导出 / 文档 / 验收脚本都读它，不在这里另写一套数字。
 
     fps 只影响帧对齐与渲染，JSON 里的时间永远是秒。
     """
@@ -39,7 +39,7 @@ class ProjectSettingsDialog(QDialog):
     def __init__(self, meta: Dict[str, Any], parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("项目设置")
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(380)
 
         self._name = QLineEdit(str(meta.get("name", "未命名项目")))
 
@@ -54,25 +54,31 @@ class ProjectSettingsDialog(QDialog):
         else:
             self._fps.setEditText(f"{current_fps:g}")
 
+        width = int(meta.get("width", res.DEFAULT_RESOLUTION[0]))
+        height = int(meta.get("height", res.DEFAULT_RESOLUTION[1]))
+
+        self._aspect = QComboBox()
+        for aspect_id in res.aspect_ids():
+            self._aspect.addItem(res.label_of(aspect_id), aspect_id)
+        self._aspect.addItem("自定义比例", CUSTOM_ASPECT)
+        self._aspect.currentIndexChanged.connect(self._on_aspect_changed)
+
         self._resolution = QComboBox()
-        for label, width, height in RESOLUTION_PRESETS:
-            self._resolution.addItem(label, (width, height))
-        self._resolution.addItem("自定义", None)
         self._resolution.currentIndexChanged.connect(self._on_resolution_changed)
 
         self._width = QDoubleSpinBox()
         self._width.setDecimals(0)
         self._width.setRange(64, 7680)
-        self._width.setValue(float(meta.get("width", 1080)))
+        self._width.setValue(float(width))
         self._height = QDoubleSpinBox()
         self._height.setDecimals(0)
         self._height.setRange(64, 7680)
-        self._height.setValue(float(meta.get("height", 1920)))
+        self._height.setValue(float(height))
 
-        current = (int(meta.get("width", 1080)), int(meta.get("height", 1920)))
-        matched = self._resolution.findData(current)
-        self._resolution.setCurrentIndex(matched if matched >= 0 else self._resolution.count() - 1)
-        self._on_resolution_changed()
+        detected = res.aspect_of(width, height)
+        aspect_index = self._aspect.findData(detected or CUSTOM_ASPECT)
+        self._aspect.setCurrentIndex(max(0, aspect_index))
+        self._reload_resolutions(keep=(width, height))
 
         self._background = QComboBox()
         self._background.setEditable(True)
@@ -80,14 +86,18 @@ class ProjectSettingsDialog(QDialog):
             self._background.addItem(preset)
         self._background.setEditText(str(meta.get("background", "#000000")))
 
-        hint = QLabel("时间线里所有时间都以秒为单位；fps 只用于帧对齐与最终渲染。")
+        hint = QLabel(
+            "时间线里所有时间都以秒为单位；fps 只用于帧对齐与最终渲染。\n"
+            "分辨率会写进 meta.width / meta.height，一路走到 Remotion 与最终 MP4。"
+        )
         hint.setWordWrap(True)
         hint.setStyleSheet("color:#7f8a99;")
 
         form = QFormLayout()
         form.addRow("项目名称（meta.name）", self._name)
         form.addRow("帧率（meta.fps）", self._fps)
-        form.addRow("分辨率预设", self._resolution)
+        form.addRow("画面比例", self._aspect)
+        form.addRow("分辨率档位", self._resolution)
         form.addRow("宽度（meta.width）", self._width)
         form.addRow("高度（meta.height）", self._height)
         form.addRow("背景色（meta.background）", self._background)
@@ -101,6 +111,53 @@ class ProjectSettingsDialog(QDialog):
         layout.addWidget(hint)
         layout.addWidget(buttons)
 
+    # ---------------------------------------------------------------- 联动
+
+    def _current_aspect(self) -> str:
+        return str(self._aspect.currentData() or CUSTOM_ASPECT)
+
+    def _index_of_resolution(self, target: Optional[Tuple[int, int]]) -> int:
+        """按**值**在分辨率下拉里找档位。
+
+        不能用 QComboBox.findData：data 是 Python 元组时 Qt 只按对象同一性比，
+        (1080, 1440) 这种等值但不同对象的元组一律找不到。
+        那样打开一个 1080×1440 的项目时下拉会停在第一档 810×1080，
+        用户什么都没改、只点了一下确定，分辨率就被悄悄换掉了。
+        """
+        if target is None:
+            return -1
+        try:
+            wanted = (int(target[0]), int(target[1]))
+        except (TypeError, ValueError, IndexError):
+            return -1
+        for index in range(self._resolution.count()):
+            data = self._resolution.itemData(index)
+            if data is not None and (int(data[0]), int(data[1])) == wanted:
+                return index
+        return -1
+
+    def _reload_resolutions(self, keep: Optional[Tuple[int, int]] = None) -> None:
+        """按当前比例重填分辨率下拉。"""
+        aspect_id = self._current_aspect()
+        self._resolution.blockSignals(True)
+        self._resolution.clear()
+        for width, height in res.resolutions_for(aspect_id):
+            self._resolution.addItem(f"{width}×{height}", (width, height))
+        self._resolution.addItem("自定义", None)
+        matched = self._index_of_resolution(keep)
+        self._resolution.setCurrentIndex(matched if matched >= 0 else 0)
+        self._resolution.blockSignals(False)
+        self._on_resolution_changed()
+
+
+    def _on_aspect_changed(self) -> None:
+        aspect_id = self._current_aspect()
+        if aspect_id == CUSTOM_ASPECT:
+            self._reload_resolutions()
+            return
+        # 换比例时默认落到该比例的常用档（1080 宽）
+        self._reload_resolutions(keep=res.default_resolution(aspect_id))
+
     def _on_resolution_changed(self) -> None:
         data = self._resolution.currentData()
         custom = data is None
@@ -109,6 +166,7 @@ class ProjectSettingsDialog(QDialog):
         if not custom:
             self._width.setValue(float(data[0]))
             self._height.setValue(float(data[1]))
+
 
     def result_meta(self) -> Dict[str, Any]:
         try:

@@ -18,7 +18,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from PyQt5.QtCore import QTimer  # noqa: E402
+from PyQt5.QtCore import Qt, QTimer  # noqa: E402
 from PyQt5.QtWidgets import QApplication  # noqa: E402
 
 from core.asset_manager import AssetManager  # noqa: E402
@@ -66,6 +66,12 @@ QToolTip { background-color: #141821; color: #d8dee9; border: 1px solid #3a4456;
 
 
 def main() -> int:
+    # Windows 11 在 125% / 150% / 175% 缩放下，Qt5 默认不缩放 → 界面按物理像素显示，
+    # 行高 44px 在 150% 屏上观感只有 29px，片段很难点。开启逻辑像素缩放后：
+    # 鼠标事件与 QPainter **都**在逻辑像素坐标系里，两者单位一致，
+    # 所以 TimelineCoordinate 的换算不需要关心 devicePixelRatio（审计第 15、16 问）。
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app = QApplication(sys.argv)
     app.setApplicationName("AI Timeline Builder")
     app.setStyleSheet(DARK_STYLESHEET)
@@ -79,6 +85,7 @@ def main() -> int:
     validator = TimelineValidator(schemas_dir, asset_manager, libraries.as_dict())
     undo_manager = UndoManager()
     model = TimelineModel(undo_manager)
+    model.set_validator(validator)   # GUI → Model → Schema 校验 → JSON 这条链的接线点
     renderer = PreviewRenderer(model, asset_manager, libraries, cache_dir)
     exporter = RemotionExporter(ROOT, asset_manager)
     projects = ProjectManager(ROOT)
@@ -94,6 +101,14 @@ def main() -> int:
         projects,
     )
     window.show()
+
+    # 退出收尾必须挂在 aboutToQuit 上，不能只写在 closeEvent 里：
+    # 「文件 → 退出」、app.quit()、任务栏结束、Ctrl+C 这些路径**不经过** closeEvent，
+    # 抽帧线程就会带着运行状态被 Qt 销毁 —— 那是进程级 fastfail（0xC0000409），
+    # 用户看到的现象是「什么都没动，程序自己崩了」。shutdown() 是幂等的。
+    app.aboutToQuit.connect(window.preview.stop)
+    app.aboutToQuit.connect(renderer.shutdown)
+
 
     window.log("AI 视频时间线规则实验器已启动。所有时间单位为秒，帧率只在渲染时使用。")
     window.log(f"工作目录：{ROOT}")

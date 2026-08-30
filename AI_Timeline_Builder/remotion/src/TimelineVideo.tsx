@@ -5,7 +5,7 @@
  * 1. 每个元素一个 <Sequence>，from/durationInFrames 由秒换算而来
  * 2. 轨道顺序决定 zIndex（tracks 数组越靠后越上层）
  * 3. 元素内部用自己的局部帧算 geometry，再把此刻生效的程序特效折叠进去
- * 4. 参与转场的片段不单独渲染，由 TransitionLayer 一并画出
+ * 4. 参与转场的片段照常渲染，只在转场那几帧里让位给 TransitionLayer
  * 5. 全屏特效最后盖在最上层
  */
 
@@ -17,13 +17,14 @@ import { OverlayLayer } from "./elements/OverlayLayer";
 import { TextLayer } from "./elements/TextLayer";
 import { VideoLayer } from "./elements/VideoLayer";
 import { ScreenEffects } from "./effects/ScreenEffects";
-import { TransitionLayer } from "./effects/TransitionLayer";
+import { TransitionLayer } from "./transitions/TransitionLayer";
 import { foldEffects } from "./effects/programEffects";
 import type { AssetManifest, Timeline, TimelineElement } from "./lib/timeline";
 import {
   baseGeometry,
-  elementEnd,
   findTrack,
+  isCoveredByTransition,
+  timelineDuration,
   toDurationFrames,
   toFrames,
   trackZIndex,
@@ -49,11 +50,17 @@ const ElementRenderer: React.FC<{
   timeline: Timeline;
   manifest: AssetManifest;
   effects: TimelineElement[];
-}> = ({ element, timeline, manifest, effects }) => {
+  transitions: TimelineElement[];
+}> = ({ element, timeline, manifest, effects, transitions }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const localTime = frame / fps;
   const now = (element.start ?? 0) + localTime;
+
+  // 转场那几帧里让位给 TransitionLayer，其余时间照常自己渲染
+  if (isCoveredByTransition(element, transitions, now)) {
+    return null;
+  }
 
   const geometry = foldEffects(
     baseGeometry(element, localTime),
@@ -63,6 +70,7 @@ const ElementRenderer: React.FC<{
     }),
     element,
     now,
+    fps,
   );
 
   switch (element.type) {
@@ -100,7 +108,7 @@ const ScreenEffectsHost: React.FC<{ effects: TimelineElement[] }> = ({ effects }
   if (active.length === 0) {
     return null;
   }
-  return <ScreenEffects effects={active} now={now} />;
+  return <ScreenEffects effects={active} now={now} fps={fps} />;
 };
 
 export const TimelineVideo: React.FC<TimelineVideoProps> = ({
@@ -112,14 +120,9 @@ export const TimelineVideo: React.FC<TimelineVideoProps> = ({
 
   const effects = elements.filter((e) => e.type === "effect");
   const transitions = elements.filter((e) => e.type === "transition");
-  const consumed = new Set<string>();
-  for (const transition of transitions) {
-    if (transition.from) consumed.add(transition.from);
-    if (transition.to) consumed.add(transition.to);
-  }
 
   const visuals = elements
-    .filter((e) => VISUAL_TYPES.has(e.type) && !consumed.has(e.id))
+    .filter((e) => VISUAL_TYPES.has(e.type))
     .filter((e) => !findTrack(timeline, e.track)?.hidden)
     .sort(
       (a, b) =>
@@ -147,6 +150,7 @@ export const TimelineVideo: React.FC<TimelineVideoProps> = ({
             timeline={timeline}
             manifest={manifest}
             effects={effects}
+            transitions={transitions}
           />
         </Sequence>
       ))}
@@ -175,7 +179,7 @@ export const TimelineVideo: React.FC<TimelineVideoProps> = ({
           from={toFrames(element.start ?? 0, fps)}
           durationInFrames={toDurationFrames(element.duration ?? 0, fps)}
         >
-          <AudioLayer element={element} manifest={manifest} />
+          <AudioLayer element={element} manifest={manifest} timeline={timeline} />
         </Sequence>
       ))}
 
@@ -186,11 +190,6 @@ export const TimelineVideo: React.FC<TimelineVideoProps> = ({
   );
 };
 
-/** 供 calculateMetadata 使用：总时长（帧）。 */
-export const timelineDurationInFrames = (timeline: Timeline): number => {
-  const seconds = (timeline.elements ?? []).reduce(
-    (acc, element) => Math.max(acc, elementEnd(element)),
-    0,
-  );
-  return Math.max(1, Math.round(seconds * (timeline.meta?.fps ?? 30)));
-};
+/** 供 calculateMetadata 使用：总时长（帧）。秒→帧只走 lib/timeline 的唯一入口。 */
+export const timelineDurationInFrames = (timeline: Timeline): number =>
+  toDurationFrames(timelineDuration(timeline), timeline.meta?.fps ?? 30);

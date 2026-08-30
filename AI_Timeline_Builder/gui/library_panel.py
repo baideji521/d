@@ -32,6 +32,7 @@ SECTIONS = [
     ("effect_program", "程序特效"),
     ("effect_material", "素材特效"),
     ("transition", "转场"),
+    ("sound", "音效库"),
     ("caption", "字幕模板"),
     ("animation", "动画（关键帧模板）"),
     ("template", "组合模板"),
@@ -118,17 +119,17 @@ class LibraryPanel(QWidget):
     def _items_for_section(self, section: str) -> List[Dict[str, Any]]:
         if section == "effect_program":
             return [
-                {"kind": "effect", "id": e["name"], "label": e["label"], "category": e.get("category", ""), "raw": e}
+                {"kind": "effect", "id": e["name"], "label": e["label"], "category": e.get("display_category", ""), "raw": e}
                 for e in self._libraries.effect.program_effects()
             ]
         if section == "effect_material":
             return [
-                {"kind": "effect_material", "id": e["name"], "label": e["label"], "category": e.get("category", ""), "raw": e}
+                {"kind": "effect_material", "id": e["name"], "label": e["label"], "category": e.get("display_category", ""), "raw": e}
                 for e in self._libraries.effect.material_effects()
             ]
         if section == "transition":
             return [
-                {"kind": "transition", "id": t["name"], "label": t["label"], "category": t.get("category", ""), "raw": t}
+                {"kind": "transition", "id": t["name"], "label": t["label"], "category": t.get("display_category", ""), "raw": t}
                 for t in self._libraries.transition.all()
             ]
         if section == "caption":
@@ -155,6 +156,9 @@ class LibraryPanel(QWidget):
     def refresh(self) -> None:
         section = self._current_section()
         keyword = self._search.text().strip().lower()
+        if section == "sound":
+            self._refresh_sound(keyword)
+            return
         items = self._items_for_section(section)
 
         groups: Dict[str, List[Dict[str, Any]]] = {}
@@ -180,7 +184,62 @@ class LibraryPanel(QWidget):
                 parent.addChild(child)
             parent.setExpanded(True)
 
+    # ------------------------------------------------------------ 音效库
+
+    def _refresh_sound(self, keyword: str) -> None:
+        """音效库：分组 = 系统支持的类型（全部列出），子项 = 本地真实存在的文件。
+
+        没有本地文件的类型也保留分组，并显式写「本地暂无文件」——
+        不能因为没素材就把类型藏起来，那样看着像不支持；
+        也绝不显示清单里有、磁盘上没有的文件（`SoundLibrary.files()` 已经过滤过）。
+        """
+        sounds = self._libraries.sound
+        self.tree.clear()
+        for spec in sounds.categories():
+            rows = sounds.files(spec["key"])
+            if keyword:
+                rows = [
+                    a for a in rows
+                    if keyword in f'{a.get("id", "")} {a.get("name", "")} {a.get("path", "")}'.lower()
+                ]
+            parent = QTreeWidgetItem([f'{spec["label"]}（{len(rows)}）'])
+            parent.setForeground(0, QColor("#7f8a99"))
+            parent.setFlags(Qt.ItemIsEnabled)
+            self.tree.addTopLevelItem(parent)
+            if not rows:
+                placeholder = QTreeWidgetItem(["本地暂无文件（类型受支持）"])
+                placeholder.setForeground(0, QColor("#5b687a"))
+                placeholder.setFlags(Qt.ItemIsEnabled)
+                parent.addChild(placeholder)
+                continue
+            for asset in rows:
+                duration = float(asset.get("duration") or 0.0)
+                child = QTreeWidgetItem([f'{asset.get("name", "")}    {duration:.3f}s'])
+                child.setData(0, Qt.UserRole, {"kind": "asset", "id": str(asset.get("id", ""))})
+                child.setToolTip(0, str(asset.get("path", "")))
+                parent.addChild(child)
+            # 默认只展开小分组：ui 有 100 个文件，全展开没法看
+            parent.setExpanded(bool(keyword) or len(rows) <= 12)
+
+    def _describe_sound(self, asset_id: str) -> str:
+        sounds = self._libraries.sound
+        asset = next((a for a in sounds.files() if str(a.get("id")) == asset_id), None)
+        if asset is None:
+            return "这个音效文件已经不在磁盘上了，重新扫描素材库看看"
+        category = str(asset.get("category") or "")
+        lines = [
+            f'asset id: {asset.get("id")}    写入 JSON 的 type: audio',
+            f'文件: {asset.get("path")}',
+            f'时长: {float(asset.get("duration") or 0.0):.3f}s',
+            f"类型: {sounds.label_of(category)}（{category}）    建议轨道: {sounds.track_for(category)}",
+            "",
+            "元素字段：volume 等于 1 就不写；fade 只写非零的一侧",
+            '  {"type": "audio", "asset": "%s", "volume": 0.8, "fade": {"in": 0.05}}' % asset.get("id"),
+        ]
+        return "\n".join(lines)
+
     # ------------------------------------------------------------ 详情
+
 
     def _on_current_changed(self, current: Optional[QTreeWidgetItem], _previous) -> None:
         if current is None:
@@ -194,6 +253,8 @@ class LibraryPanel(QWidget):
 
     def _describe(self, kind: str, item_id: str) -> str:
         lines: List[str] = []
+        if kind == "asset":
+            return self._describe_sound(item_id)
         if kind in ("effect", "effect_material"):
             effect = self._libraries.effect.get(item_id)
             if not effect:

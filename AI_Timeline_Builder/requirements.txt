@@ -1,0 +1,12 @@
+# AI_Timeline_Builder 运行依赖
+#
+# 安装：python -m pip install -r requirements.txt
+#
+# PyQt5      GUI
+# jsonschema Timeline JSON 的 Schema 校验。缺它时 core/timeline_validator.py
+#            的 _validate_schema() 会静默跳过（HAS_JSONSCHEMA=False），
+#            只剩语义规则在跑，很容易误以为「0 问题」＝完全合规。
+# pytest     测试（tests/）
+PyQt5==5.15.11
+jsonschema==4.23.0
+pytest==8.3.4

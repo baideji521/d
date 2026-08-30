@@ -132,7 +132,8 @@ class PropertyPanel(QScrollArea):
         elif etype == "freeze":
             self._layout.addWidget(self._build_freeze(element))
 
-        if isinstance(element.get("transform"), dict):
+        # 按类型判断有没有 transform 语义 —— 稀疏 JSON 里没有 transform 字段是常态
+        if tl.supports_transform(element):
             self._layout.addWidget(self._build_transform(element))
         if etype not in ("transition",):
             self._layout.addWidget(self._build_keyframes(element))
@@ -349,7 +350,8 @@ class PropertyPanel(QScrollArea):
         info.setStyleSheet("color:#7f8a99;")
         form.addRow("素材信息", info)
 
-        source = element.setdefault("source", {"start": 0.0, "end": 1.0})
+        # 面板只读，不往元素里写默认值（写回会污染稀疏 JSON）
+        source = element.get("source") or {"start": 0.0, "end": 1.0}
         self._row(
             form,
             "原素材开始",
@@ -394,9 +396,11 @@ class PropertyPanel(QScrollArea):
             ),
         )
 
-        audio = element.setdefault("audio", {"enabled": True, "volume": 1.0})
+        # 阶段 6.5：只读取「生效值」，不能 setdefault 把默认值写回元素，
+        # 否则光是打开属性面板就会往 JSON 里塞 audio 默认值
+        audio = tl.effective_audio(element)
         enabled = QCheckBox("保留原声")
-        enabled.setChecked(bool(audio.get("enabled", True)))
+        enabled.setChecked(bool(audio["enabled"]))
         enabled.toggled.connect(lambda value: self._write(["audio", "enabled"], value, "切换原声"))
         self._row(form, "原声", "audio.enabled", enabled)
         self._row(
@@ -404,7 +408,7 @@ class PropertyPanel(QScrollArea):
             "原声音量",
             "audio.volume",
             self._number(
-                audio.get("volume", 1.0),
+                audio["volume"],
                 lambda value: self._write(["audio", "volume"], round(value, 2), "修改原声音量"),
                 minimum=0.0,
                 maximum=4.0,
@@ -477,7 +481,7 @@ class PropertyPanel(QScrollArea):
             ),
         )
 
-        content = element.setdefault("content", {})
+        content = element.get("content") or {}
         if element.get("type") == "caption_group" or content.get("words"):
             self._layout_words_editor(form, element)
         else:
@@ -488,7 +492,9 @@ class PropertyPanel(QScrollArea):
             )
             self._row(form, "文本", "content.text", editor)
 
-        highlight = element.setdefault("highlight", {"color": "#FFE347", "backgroundColor": "", "scale": 1.1})
+        highlight = element.get("highlight") or {
+            "color": "#FFE347", "backgroundColor": "", "scale": 1.1
+        }
         self._row(
             form,
             "高亮颜色",
@@ -575,8 +581,8 @@ class PropertyPanel(QScrollArea):
         return handler
 
     def _add_style_rows(self, form: QFormLayout, element: Dict[str, Any]) -> None:
-        style = element.setdefault("style", {})
-        stroke = style.setdefault("stroke", {"width": 0, "color": "#000000"})
+        style = element.get("style") or {}
+        stroke = style.get("stroke") or {"width": 0, "color": "#000000"}
 
         font_edit = QLineEdit(style.get("fontFamily", "Arial"))
         font_edit.editingFinished.connect(
@@ -663,7 +669,7 @@ class PropertyPanel(QScrollArea):
                 "audio", element.get("asset", ""), lambda value: self._write(["asset"], value, "更换音频")
             ),
         )
-        source = element.setdefault("source", {"start": 0.0, "end": element.get("duration", 1.0)})
+        source = element.get("source") or {"start": 0.0, "end": element.get("duration", 1.0)}
         self._row(
             form,
             "源裁剪开始",
@@ -713,7 +719,7 @@ class PropertyPanel(QScrollArea):
                 step=0.05,
             ),
         )
-        fade = element.setdefault("fade", {"in": 0.0, "out": 0.0})
+        fade = tl.effective_fade(element)
         self._row(
             form,
             "淡入",
@@ -867,7 +873,7 @@ class PropertyPanel(QScrollArea):
         definition: Optional[Dict[str, Any]],
     ) -> None:
         """按库里的参数表自动生成控件。JSON 里的 params 字段与此一一对应。"""
-        params = element.setdefault("params", {})
+        params = element.get("params") or {}
         if not definition:
             raw = QPlainTextEdit(json.dumps(params, ensure_ascii=False, indent=2))
             raw.setFixedHeight(90)
@@ -1058,7 +1064,9 @@ class PropertyPanel(QScrollArea):
         box = self._group("变换 Transform")
         form = QFormLayout(box)
         form.setLabelAlignment(Qt.AlignRight)
-        transform = element.setdefault("transform", tl.default_transform())
+        # 显示的是「最终生效值」，不是「用户设置了什么」——
+        # 面板读取默认值不等于把默认值写进 JSON（阶段 6.5 指令第六 / 二十条）
+        transform = tl.effective_transform(element)
 
         hint = QLabel("X / Y 是归一化中心点坐标：0=左上，1=右下。可以直接在预览画面上拖。")
         hint.setWordWrap(True)
@@ -1077,7 +1085,7 @@ class PropertyPanel(QScrollArea):
                 label,
                 f"transform.{key}",
                 self._number(
-                    transform.get(key, tl.KEYFRAME_NEUTRAL.get(key, 0.0)),
+                    transform[key],
                     lambda value, k=key: self._write(["transform", k], round(value, 3), "修改变换"),
                     minimum=minimum,
                     maximum=maximum,

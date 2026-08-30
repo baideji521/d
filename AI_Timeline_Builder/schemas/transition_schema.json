@@ -18,12 +18,19 @@
       "properties": {
         "key": { "type": "string" },
         "label": { "type": "string" },
-        "type": { "enum": ["number", "int", "bool", "enum", "color"] },
+        "type": {
+          "enum": [
+            "number", "int", "integer", "bool", "boolean",
+            "string", "str", "text", "enum", "color"
+          ],
+          "description": "integer/boolean/str/text 是别名，TransitionRegistry 会归一化"
+        },
         "default": {},
         "min": { "type": "number" },
         "max": { "type": "number" },
         "step": { "type": "number" },
         "options": { "type": "array", "items": { "type": "string" } },
+        "ui": { "enum": ["slider", "spin", "checkbox", "combo", "color", "line"] },
         "hint": { "type": "string" }
       }
     },
@@ -34,7 +41,25 @@
       "properties": {
         "name": { "type": "string" },
         "label": { "type": "string" },
-        "category": { "type": "string" },
+        "category": {
+          "enum": ["basic", "impact", "geometric", "stylized"],
+          "description": "标准分类，按交接手法划分"
+        },
+        "display_category": { "type": "string", "description": "GUI 库面板的中文分组，纯展示用" },
+        "supported_from": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "from 侧允许的元素 type"
+        },
+        "supported_to": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "to 侧允许的元素 type"
+        },
+        "renderer": {
+          "type": "string",
+          "description": "Remotion 侧 transitionRenderers 里注册的名字。空 = 尚无 renderer"
+        },
         "default_duration": { "type": "number", "exclusiveMinimum": 0 },
         "description": { "type": "string" },
         "params": { "type": "array", "items": { "$ref": "#/definitions/param" } }

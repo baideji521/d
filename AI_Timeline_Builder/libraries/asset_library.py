@@ -6,11 +6,13 @@ AssetManager 负责扫描与清单读写（数据），本模块负责「怎么�
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional
 
 from libraries.animation_library import AnimationLibrary
 from libraries.caption_library import CaptionLibrary
 from libraries.effect_library import EffectLibrary
+from libraries.sound_library import SoundLibrary
 from libraries.template_library import TemplateLibrary
 from libraries.transition_library import TransitionLibrary
 
@@ -52,7 +54,7 @@ class AssetLibrary:
         return self._assets.categories_of(section["asset_type"])
 
     def describe(self, asset: Dict[str, Any]) -> str:
-        """素材列表项的副标题：时长 / 分辨率 / 大小。"""
+        """素材列表项的副标题：时长 / 分辨率 / 帧率 / 格式 / 大小。"""
         parts: List[str] = [asset.get("id", "")]
         if asset.get("duration"):
             parts.append(f"{float(asset['duration']):.2f}s")
@@ -60,12 +62,21 @@ class AssetLibrary:
             parts.append(f"{asset['width']}×{asset['height']}")
         if asset.get("fps"):
             parts.append(f"{asset['fps']:g}fps")
+        fmt = self.format_of(asset)
+        if fmt:
+            parts.append(fmt)
         size = asset.get("size_bytes") or 0
         if size:
             parts.append(self.format_size(size))
         if asset.get("has_alpha"):
             parts.append("含透明通道")
         return "  ".join(parts)
+
+    @staticmethod
+    def format_of(asset: Dict[str, Any]) -> str:
+        """容器格式。直接取扩展名——不解码文件，列表刷新才不会卡。"""
+        ext = os.path.splitext(str(asset.get("path") or ""))[1]
+        return ext.lstrip(".").upper()
 
     @staticmethod
     def format_size(size_bytes: int) -> str:
@@ -98,6 +109,12 @@ class Libraries:
         self.caption = CaptionLibrary(assets_dir)
         self.animation = AnimationLibrary(assets_dir)
         self.template = TemplateLibrary(assets_dir)
+        self._asset_manager = asset_manager
+
+    @property
+    def sound(self) -> SoundLibrary:
+        """音效库。每次取都按当前素材清单重建 —— 重新扫描之后不该还拿着旧快照。"""
+        return SoundLibrary(self._asset_manager.all(), self._asset_manager.root)
 
     def as_dict(self) -> Dict[str, Any]:
         """给校验器用的映射。"""

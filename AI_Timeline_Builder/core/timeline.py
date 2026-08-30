@@ -107,9 +107,141 @@ EASING_LABELS = {
 }
 
 
+# ---------------------------------------------------------------- 默认值
+#
+# 阶段 6.5：这些是**Runtime 在字段缺省时会使用的值**，集中定义在这里。
+# 关键约定：只有取值等于这里的默认值时，序列化才允许省略该字段
+# （core/sparse.py 的 default elision）。
+# 反过来说，凡是「工厂创建时的摆放习惯」与 Runtime 默认值不一致的字段
+# （例如 text 的 transform.y=0.7、effect 的 easing=easeInOut），
+# 都必须如实写进 JSON —— 省掉它们会改变画面，那不是清理而是 bug。
+
+#: transform 各分量的 Runtime 默认值。与 remotion/src/lib/timeline.ts 的 NEUTRAL
+#: 以及本文件 KEYFRAME_NEUTRAL 保持一致。
+DEFAULT_TRANSFORM: Dict[str, float] = {
+    "x": 0.5,
+    "y": 0.5,
+    "scale": 1.0,
+    "rotation": 0.0,
+    "opacity": 1.0,
+}
+
+#: 播放速度默认值（VideoLayer / AudioLayer 的 `element.speed ?? 1`）
+DEFAULT_SPEED = 1.0
+
+#: video 元素内嵌音轨的默认值（VideoLayer 的 `audio.enabled === false` / `?? 1`）
+DEFAULT_AUDIO: Dict[str, Any] = {"enabled": True, "volume": 1.0}
+
+#: audio 元素自身音量默认值（AudioLayer 的 `element.volume ?? 1`）
+DEFAULT_VOLUME = 1.0
+
+#: 音频淡入淡出默认值
+DEFAULT_FADE: Dict[str, float] = {"in": 0.0, "out": 0.0}
+
+#: 全局输出音量默认值（Remotion 侧 `masterVolume()` 的 `?? 1`）。
+#: 兼容扩展：写在 meta.master_volume，等于 1 时不落盘；0 = 整片静音。
+DEFAULT_MASTER_VOLUME = 1.0
+
+#: 全局音量允许范围，与元素级 volume 一致（schema 也是 0..4）
+MASTER_VOLUME_RANGE = (0.0, 4.0)
+
+#: 项目背景色默认值（TimelineVideo 的 `meta.background ?? "#000000"`）
+DEFAULT_BACKGROUND = "#000000"
+
+#: 带 transform / keyframes 语义的元素类型。
+#: 用类型判断，而不是「JSON 里有没有 transform 字段」——
+#: 稀疏 JSON 里没有 transform 恰恰是常态。
+TRANSFORM_TYPES = ("video", "overlay", "text", "caption", "caption_group", "freeze")
+
+
 def default_transform() -> Dict[str, float]:
     """标准 transform：画面居中、原始大小、不旋转、完全不透明。"""
-    return {"x": 0.5, "y": 0.5, "scale": 1.0, "rotation": 0.0, "opacity": 1.0}
+    return dict(DEFAULT_TRANSFORM)
+
+
+def supports_transform(element: Dict[str, Any]) -> bool:
+    """这个元素是否有 transform 语义（与字段是否存在无关）。"""
+    return element.get("type") in TRANSFORM_TYPES
+
+
+# ---------------------------------------------------------------- Effective Value
+#
+# element.get("transform") 回答的是「用户设置了什么」，
+# effective_transform() 回答的是「当前最终生效值是什么」。
+# 这两个语义必须分开，GUI 显示与渲染用后者，序列化用前者。
+
+
+def effective_transform(element: Dict[str, Any]) -> Dict[str, float]:
+    """最终生效的 transform。缺省分量按 Runtime 默认值补齐，不回写元素。"""
+    result = dict(DEFAULT_TRANSFORM)
+    raw = element.get("transform")
+    if isinstance(raw, dict):
+        for key in DEFAULT_TRANSFORM:
+            if key in raw:
+                result[key] = as_seconds(raw[key])
+    return result
+
+
+def effective_speed(element: Dict[str, Any]) -> float:
+    """最终生效的播放速度。0 / 脏值按默认值处理，避免除零。"""
+    if "speed" not in element:
+        return DEFAULT_SPEED
+    value = as_seconds(element.get("speed"))
+    return value if value > 0 else DEFAULT_SPEED
+
+
+def effective_audio(element: Dict[str, Any]) -> Dict[str, Any]:
+    """video 元素最终生效的内嵌音轨设置。"""
+    result = dict(DEFAULT_AUDIO)
+    raw = element.get("audio")
+    if isinstance(raw, dict):
+        if "enabled" in raw:
+            result["enabled"] = bool(raw["enabled"])
+        if "volume" in raw:
+            result["volume"] = as_seconds(raw["volume"])
+    return result
+
+
+def effective_volume(element: Dict[str, Any]) -> float:
+    """audio 元素最终生效的音量。"""
+    if "volume" not in element:
+        return DEFAULT_VOLUME
+    return as_seconds(element.get("volume"))
+
+
+def effective_fade(element: Dict[str, Any]) -> Dict[str, float]:
+    """最终生效的淡入淡出秒数。"""
+    result = dict(DEFAULT_FADE)
+    raw = element.get("fade")
+    if isinstance(raw, dict):
+        for key in DEFAULT_FADE:
+            if key in raw:
+                result[key] = as_seconds(raw[key])
+    return result
+
+
+def effective_keyframes(element: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    """最终生效的关键帧表。没有关键帧时返回空 dict（不是 None）。"""
+    raw = element.get("keyframes")
+    if not isinstance(raw, dict):
+        return {}
+    return {k: v for k, v in raw.items() if isinstance(v, list) and v}
+
+
+def effective_master_volume(timeline: Dict[str, Any]) -> float:
+    """最终生效的全局输出音量。
+
+    与 Remotion 侧 `masterVolume()` 同语义：缺省 / 非数字都按 1，越界夹到 0..4。
+    """
+    raw = (timeline.get("meta") or {}).get("master_volume")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_MASTER_VOLUME
+    if value != value or value in (float("inf"), float("-inf")):  # NaN / inf
+        return DEFAULT_MASTER_VOLUME
+    low, high = MASTER_VOLUME_RANGE
+    return max(low, min(high, value))
 
 
 # ---------------------------------------------------------------- 空时间线
@@ -150,9 +282,13 @@ def make_video(
     source_end: float = 3.0,
     speed: float = 1.0,
 ) -> Dict[str, Any]:
-    """视频片段。duration 由源区间与速度决定，GUI 会同时展示这三组时间。"""
+    """视频片段。duration 由源区间与速度决定，GUI 会同时展示这三组时间。
+
+    阶段 6.5：只写用户真正表达的东西。transform / audio / keyframes 不再预填，
+    speed 也只在不等于默认值时才写 —— 缺省字段由 Runtime 按默认值处理。
+    """
     duration = max(0.04, (source_end - source_start) / max(0.01, speed))
-    return {
+    element = {
         "id": element_id,
         "type": "video",
         "track": track,
@@ -160,11 +296,10 @@ def make_video(
         "start": round(start, 3),
         "duration": round(duration, 3),
         "source": {"start": round(source_start, 3), "end": round(source_end, 3)},
-        "transform": default_transform(),
-        "speed": speed,
-        "audio": {"enabled": True, "volume": 1.0},
-        "keyframes": {},
     }
+    if speed != DEFAULT_SPEED:
+        element["speed"] = speed
+    return element
 
 
 def make_overlay(
@@ -182,8 +317,6 @@ def make_overlay(
         "asset": asset_id,
         "start": round(start, 3),
         "duration": round(duration, 3),
-        "transform": default_transform(),
-        "keyframes": {},
     }
 
 
@@ -194,7 +327,12 @@ def make_text(
     start: float = 0.0,
     duration: float = 1.0,
 ) -> Dict[str, Any]:
-    """普通文字 / 标题 / 强调文字。与 Caption 完全分开。"""
+    """普通文字 / 标题 / 强调文字。与 Caption 完全分开。
+
+    transform 只写 y —— 文字默认摆在偏下位置（0.7），这与 Runtime 的默认 0.5
+    不同，属于真实的摆放意图，必须落到 JSON 里；x / scale / rotation / opacity
+    等于 Runtime 默认值，省略。
+    """
     return {
         "id": element_id,
         "type": "text",
@@ -210,8 +348,7 @@ def make_text(
             "align": "center",
             "stroke": {"width": 8, "color": "#000000"},
         },
-        "transform": {"x": 0.5, "y": 0.7, "scale": 1.0, "rotation": 0.0, "opacity": 1.0},
-        "keyframes": {},
+        "transform": {"y": 0.7},
     }
 
 
@@ -242,8 +379,7 @@ def make_caption(
             "align": "center",
             "stroke": {"width": 6, "color": "#000000"},
         },
-        "transform": {"x": 0.5, "y": 0.82, "scale": 1.0, "rotation": 0.0, "opacity": 1.0},
-        "keyframes": {},
+        "transform": {"y": 0.82},
     }
 
 
@@ -275,8 +411,7 @@ def make_caption_group(
             "stroke": {"width": 6, "color": "#000000"},
         },
         "highlight": {"color": "#FFE347", "backgroundColor": "", "scale": 1.12},
-        "transform": {"x": 0.5, "y": 0.82, "scale": 1.0, "rotation": 0.0, "opacity": 1.0},
-        "keyframes": {},
+        "transform": {"y": 0.82},
     }
 
 
@@ -288,9 +423,16 @@ def make_audio(
     duration: float = 1.0,
     source_start: float = 0.0,
     volume: float = 1.0,
+    fade_in: float = 0.0,
+    fade_out: float = 0.0,
 ) -> Dict[str, Any]:
-    """音频。BGM / 人声 / 音效共用此类型，靠轨道区分用途。"""
-    return {
+    """音频。BGM / 人声 / 音效共用此类型，靠轨道区分用途。
+
+    speed 是默认值就不写；volume 只在不等于 1 时写；
+    fade 只写非零的那一侧（Remotion 侧 `AudioLayer` 读 `fade.in` / `fade.out`，
+    缺省即 0，所以写 0 是纯噪声）。
+    """
+    element = {
         "id": element_id,
         "type": "audio",
         "track": track,
@@ -298,10 +440,17 @@ def make_audio(
         "start": round(start, 3),
         "duration": round(duration, 3),
         "source": {"start": round(source_start, 3), "end": round(source_start + duration, 3)},
-        "speed": 1.0,
-        "volume": volume,
-        "fade": {"in": 0.0, "out": 0.0},
     }
+    if volume != DEFAULT_VOLUME:
+        element["volume"] = volume
+    fade = {}
+    if fade_in > 0:
+        fade["in"] = round(float(fade_in), 3)
+    if fade_out > 0:
+        fade["out"] = round(float(fade_out), 3)
+    if fade:
+        element["fade"] = fade
+    return element
 
 
 def make_effect(
@@ -371,8 +520,6 @@ def make_freeze(
         "source_time": round(source_time, 3),
         "start": round(start, 3),
         "duration": round(duration, 3),
-        "transform": default_transform(),
-        "keyframes": {},
     }
 
 
@@ -442,13 +589,34 @@ def resolve_animated_value(
 # ---------------------------------------------------------------- 派生信息
 
 
+def as_seconds(value: Any) -> float:
+    """把任意输入宽容地读成秒。
+
+    这些派生函数会在**校验之前**跑到 —— JSON 面板里粘一段坏数据、
+    或者外部/AI 生成的 JSON 里 duration 写成 "五秒"，都会先经过
+    TimelineModel._normalize() → timeline_duration()。
+    这里必须不抛异常，否则界面直接崩，用户根本看不到校验错误。
+    脏值按 0 处理，真正的报错留给 TimelineValidator 的 Schema 层。
+    """
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if number != number or number in (float("inf"), float("-inf")):  # NaN / inf
+        return 0.0
+    return number
+
+
 def timeline_duration(timeline: Dict[str, Any]) -> float:
     """时间线总时长 = 所有元素结束时间的最大值。"""
     end = 0.0
     for element in timeline.get("elements", []):
-        e = float(element.get("start", 0.0)) + float(element.get("duration", 0.0))
+        if not isinstance(element, dict):
+            continue
+        e = as_seconds(element.get("start")) + as_seconds(element.get("duration"))
         end = max(end, e)
     return round(end, 3)
+
 
 
 def track_z_index(timeline: Dict[str, Any], track_id: str) -> int:
@@ -483,7 +651,8 @@ def elements_on_track(timeline: Dict[str, Any], track_id: str) -> List[Dict[str,
 
 def element_end(element: Dict[str, Any]) -> float:
     """元素在时间线上的结束时间。"""
-    return float(element.get("start", 0.0)) + float(element.get("duration", 0.0))
+    return as_seconds(element.get("start")) + as_seconds(element.get("duration"))
+
 
 
 def next_element_id(timeline: Dict[str, Any], type_name: str) -> str:

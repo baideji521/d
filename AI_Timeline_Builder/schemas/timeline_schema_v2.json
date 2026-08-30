@@ -1,0 +1,521 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "timeline_schema_v2.json",
+  "title": "AI Timeline DSL v2",
+  "description": "GUI 与 AI 共用的 Timeline 协议 v2。所有时间字段单位为秒，元素按 type 严格分派（oneOf），每个变体都启用 additionalProperties:false。v1 → v2 由 core/migrations/migration_v1_v2.py 负责。",
+  "type": "object",
+  "required": ["version", "time_unit", "meta", "tracks", "elements"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 2 },
+    "time_unit": { "const": "seconds" },
+    "meta": { "$ref": "#/definitions/meta" },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/track" }
+    },
+    "elements": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/element" }
+    }
+  },
+
+  "definitions": {
+    "meta": {
+      "type": "object",
+      "required": ["name", "fps", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "fps": { "type": "number", "minimum": 1, "maximum": 120 },
+        "width": { "type": "integer", "minimum": 16 },
+        "height": { "type": "integer", "minimum": 16 },
+        "duration": { "type": "number", "minimum": 0, "description": "派生值，由总时长推出，写回方便阅读" },
+        "background": { "type": "string" },
+        "master_volume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "全局输出音量。缺省即 1（原样输出），0 = 整片静音"
+        },
+        "markers": {
+          "type": "array",
+          "description": "时间线标记。纯标注，不参与渲染；缺省即没有标记（保持稀疏）",
+          "items": { "$ref": "#/definitions/marker" }
+        }
+      }
+    },
+
+    "marker": {
+      "type": "object",
+      "required": ["time", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "time": { "type": "number", "minimum": 0 },
+        "type": {
+          "enum": ["normal", "highlight", "transition", "caption", "sfx", "ai_highlight"]
+        },
+        "label": { "type": "string" }
+      }
+    },
+
+
+    "track": {
+      "type": "object",
+      "required": ["id", "name", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "name": { "type": "string" },
+        "kind": { "enum": ["video", "text", "audio"] },
+        "locked": { "type": "boolean" },
+        "hidden": { "type": "boolean" }
+      }
+    },
+
+    "timing": {
+      "type": "object",
+      "description": "Timeline Time：成片时间轴上的位置与长度",
+      "required": ["start", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "type": "number", "minimum": 0 },
+        "duration": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+
+    "sourceWindow": {
+      "type": "object",
+      "description": "Source Time：从素材内部取哪一段。与 timing 完全独立",
+      "required": ["start", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "type": "number", "minimum": 0 },
+        "duration": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+
+    "playback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "speed": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "description": "0=左 1=右，画面归一化坐标" },
+        "y": { "type": "number", "description": "0=上 1=下，画面归一化坐标" },
+        "scale": { "type": "number", "exclusiveMinimum": 0 },
+        "rotation": { "type": "number", "description": "角度" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+
+    "keyframe": {
+      "type": "object",
+      "required": ["time", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "time": { "type": "number", "minimum": 0, "description": "相对元素自身起点的秒数" },
+        "value": { "type": "number" },
+        "easing": { "$ref": "#/definitions/easing" }
+      }
+    },
+
+    "keyframeList": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/keyframe" }
+    },
+
+    "keyframes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scale": { "$ref": "#/definitions/keyframeList" },
+        "x": { "$ref": "#/definitions/keyframeList" },
+        "y": { "$ref": "#/definitions/keyframeList" },
+        "rotation": { "$ref": "#/definitions/keyframeList" },
+        "opacity": { "$ref": "#/definitions/keyframeList" },
+        "blur": { "$ref": "#/definitions/keyframeList" },
+        "brightness": { "$ref": "#/definitions/keyframeList" },
+        "contrast": { "$ref": "#/definitions/keyframeList" },
+        "saturation": { "$ref": "#/definitions/keyframeList" }
+      }
+    },
+
+    "easing": { "enum": ["linear", "easeIn", "easeOut", "easeInOut"] },
+
+    "textStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fontFamily": { "type": "string" },
+        "fontSize": { "type": "number", "exclusiveMinimum": 0 },
+        "fontWeight": { "type": "integer", "minimum": 100, "maximum": 900 },
+        "color": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "align": { "enum": ["left", "center", "right"] },
+        "lineHeight": { "type": "number" },
+        "letterSpacing": { "type": "number" },
+        "stroke": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "width": { "type": "number", "minimum": 0 },
+            "color": { "type": "string" }
+          }
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "blur": { "type": "number", "minimum": 0 },
+            "color": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "word": {
+      "type": "object",
+      "required": ["text", "start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string" },
+        "start": { "type": "number", "minimum": 0, "description": "绝对时间线秒数，不是相对元素的" },
+        "end": { "type": "number", "minimum": 0 }
+      }
+    },
+
+    "captionStyle": {
+      "enum": [
+        "plain",
+        "word_by_word",
+        "highlight_current",
+        "karaoke",
+        "char_by_char",
+        "bounce",
+        "pop",
+        "two_line"
+      ]
+    },
+
+    "highlight": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "scale": { "type": "number" }
+      }
+    },
+
+    "element": {
+      "oneOf": [
+        { "$ref": "#/definitions/videoElement" },
+        { "$ref": "#/definitions/imageElement" },
+        { "$ref": "#/definitions/overlayElement" },
+        { "$ref": "#/definitions/audioElement" },
+        { "$ref": "#/definitions/textElement" },
+        { "$ref": "#/definitions/captionElement" },
+        { "$ref": "#/definitions/captionGroupElement" },
+        { "$ref": "#/definitions/freezeElement" },
+        { "$ref": "#/definitions/effectElement" },
+        { "$ref": "#/definitions/transitionElement" },
+        { "$ref": "#/definitions/groupElement" }
+      ]
+    },
+
+    "videoElement": {
+      "type": "object",
+      "required": ["id", "type", "track", "timing", "asset", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "video" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "z_index": { "type": "integer" },
+        "group": { "type": "string", "description": "所属 GroupElement 的 id" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "asset": { "type": "string" },
+        "source": { "$ref": "#/definitions/sourceWindow" },
+        "playback": { "$ref": "#/definitions/playback" },
+        "audio": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "volume": { "type": "number", "minimum": 0, "maximum": 4 }
+          }
+        },
+        "transform": { "$ref": "#/definitions/transform" },
+        "keyframes": { "$ref": "#/definitions/keyframes" },
+        "animation": { "type": "string" }
+      }
+    },
+
+    "imageElement": {
+      "type": "object",
+      "required": ["id", "type", "track", "timing", "asset"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "image" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "z_index": { "type": "integer" },
+        "group": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "asset": { "type": "string" },
+        "transform": { "$ref": "#/definitions/transform" },
+        "keyframes": { "$ref": "#/definitions/keyframes" },
+        "animation": { "type": "string" }
+      }
+    },
+
+    "overlayElement": {
+      "type": "object",
+      "required": ["id", "type", "track", "timing", "asset"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "overlay" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "z_index": { "type": "integer" },
+        "group": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "asset": { "type": "string", "description": "PNG / WebP / 透明视频都走这里" },
+        "params": {
+          "type": "object",
+          "description": "素材特效的参数（来自 EffectLibrary 里 kind=material 的条目）"
+        },
+        "transform": { "$ref": "#/definitions/transform" },
+        "keyframes": { "$ref": "#/definitions/keyframes" },
+        "animation": { "type": "string" }
+      }
+    },
+
+    "audioElement": {
+      "type": "object",
+      "required": ["id", "type", "track", "timing", "asset"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "audio" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "asset": { "type": "string" },
+        "source": { "$ref": "#/definitions/sourceWindow" },
+        "playback": { "$ref": "#/definitions/playback" },
+        "volume": { "type": "number", "minimum": 0, "maximum": 4 },
+        "fade": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "in": { "type": "number", "minimum": 0 },
+            "out": { "type": "number", "minimum": 0 }
+          }
+        },
+        "group": { "type": "string" }
+      }
+    },
+
+    "textElement": {
+      "type": "object",
+      "required": ["id", "type", "track", "timing", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "text" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "z_index": { "type": "integer" },
+        "group": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "content": {
+          "type": "object",
+          "required": ["text"],
+          "additionalProperties": false,
+          "properties": { "text": { "type": "string" } }
+        },
+        "style": { "$ref": "#/definitions/textStyle" },
+        "transform": { "$ref": "#/definitions/transform" },
+        "keyframes": { "$ref": "#/definitions/keyframes" },
+        "animation": { "type": "string" }
+      }
+    },
+
+    "captionElement": {
+      "type": "object",
+      "required": ["id", "type", "track", "timing", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "caption" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "z_index": { "type": "integer" },
+        "group": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "content": {
+          "type": "object",
+          "required": ["text"],
+          "additionalProperties": false,
+          "properties": { "text": { "type": "string" } }
+        },
+        "caption_style": { "$ref": "#/definitions/captionStyle" },
+        "template": { "type": "string" },
+        "highlight": { "$ref": "#/definitions/highlight" },
+        "style": { "$ref": "#/definitions/textStyle" },
+        "transform": { "$ref": "#/definitions/transform" },
+        "keyframes": { "$ref": "#/definitions/keyframes" },
+        "animation": { "type": "string" }
+      }
+    },
+
+    "captionGroupElement": {
+      "type": "object",
+      "required": ["id", "type", "track", "timing", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "caption_group" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "z_index": { "type": "integer" },
+        "group": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "content": {
+          "type": "object",
+          "required": ["words"],
+          "additionalProperties": false,
+          "properties": {
+            "words": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/definitions/word" }
+            }
+          }
+        },
+        "caption_style": { "$ref": "#/definitions/captionStyle" },
+        "template": { "type": "string" },
+        "highlight": { "$ref": "#/definitions/highlight" },
+        "style": { "$ref": "#/definitions/textStyle" },
+        "transform": { "$ref": "#/definitions/transform" },
+        "keyframes": { "$ref": "#/definitions/keyframes" },
+        "animation": { "type": "string" }
+      }
+    },
+
+    "freezeElement": {
+      "type": "object",
+      "required": ["id", "type", "track", "timing", "target", "source_time"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "freeze" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "z_index": { "type": "integer" },
+        "group": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "target": { "type": "string", "description": "冻结哪个视频元素" },
+        "source_time": { "type": "number", "minimum": 0, "description": "冻源素材的哪一刻" },
+        "transform": { "$ref": "#/definitions/transform" },
+        "keyframes": { "$ref": "#/definitions/keyframes" },
+        "animation": { "type": "string" }
+      }
+    },
+
+    "effectElement": {
+      "type": "object",
+      "required": ["id", "type", "timing", "effect"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "effect" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "group": { "type": "string" },
+        "target": { "type": "string", "description": "省略表示作用于所有视频类元素" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "effect": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "params": { "type": "object" },
+            "easing": { "$ref": "#/definitions/easing" }
+          }
+        }
+      }
+    },
+
+    "transitionElement": {
+      "type": "object",
+      "required": ["id", "type", "timing", "from", "to", "transition"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "transition" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "group": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "transition": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "params": { "type": "object" }
+          }
+        }
+      }
+    },
+
+    "groupElement": {
+      "type": "object",
+      "required": ["id", "type", "timing", "children"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "group" },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "note": { "type": "string" },
+        "timing": { "$ref": "#/definitions/timing" },
+        "template": { "type": "string", "description": "由哪个模板展开而来" },
+        "params": { "type": "object", "description": "模板参数，重新展开时用" },
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "成员元素的 id。成员本身仍平铺在 elements 里，并用 group 字段回指"
+        }
+      }
+    }
+  }
+}

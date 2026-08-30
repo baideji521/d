@@ -1,9 +1,13 @@
-"""Transition Library：转场定义。
+"""Transition Library：内置转场数据 + 加载入口。
 
 转场在 Timeline JSON 里是 type="transition" 的元素，必须绑定 from / to 两个 Video Clip。
-start 通常取 from 片段结束前 duration 的位置，GUI 拖动两个 Clip 交界处即可调整长度。
+start 通常取 from 片段结束前 duration/2 的位置，GUI 拖动两个 Clip 交界处即可调整长度。
 
 可以在 assets/transitions/*.json 里追加自定义转场。
+
+结构化能力（分类 / supported_from / supported_to / renderer / 参数校验）全部在
+libraries/transition_registry.py，本文件只提供数据与加载。
+TransitionLibrary 就是一个预填了内置定义的 TransitionRegistry。
 """
 
 from __future__ import annotations
@@ -12,13 +16,37 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
+from libraries.transition_registry import TransitionDefinition, TransitionRegistry
+
 _DIRECTIONS = ["left", "right", "up", "down"]
+
+#: 转场两侧允许的元素 type。
+#: 这不是凭空设的限制：remotion/src/effects/TransitionLayer.tsx 的 side()
+#: 用 VideoLayer 渲染两侧，而 VideoLayer 只认 video（走 asset）和 freeze（走 target）。
+#: 文字 / 字幕 / overlay 交给它会画不出东西，所以不列入。
+SUPPORTED_SIDES: List[str] = ["video", "freeze"]
+
+#: name → 标准分类。renderer 名一律等于 name，见 _decorate()。
+_TRANSITION_CATEGORIES: Dict[str, str] = {
+    "fade": "basic",
+    "crossfade": "basic",
+    "flash": "impact",
+    "whip": "impact",
+    "zoom": "impact",
+    "wipe": "geometric",
+    "slide": "geometric",
+    "push": "geometric",
+    "spin": "stylized",
+    "blur": "stylized",
+    "glitch": "stylized",
+}
+
 
 BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "fade",
         "label": "Fade 淡入淡出",
-        "category": "基础",
+        "display_category": "基础",
         "default_duration": 0.5,
         "description": "经过纯色过渡，最稳的接法",
         "params": [
@@ -28,7 +56,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "crossfade",
         "label": "Crossfade 交叉溶解",
-        "category": "基础",
+        "display_category": "基础",
         "default_duration": 0.5,
         "description": "两个片段直接叠化，没有中间色",
         "params": [
@@ -38,7 +66,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "flash",
         "label": "Flash 闪白转场",
-        "category": "冲击",
+        "display_category": "冲击",
         "default_duration": 0.3,
         "description": "闪白过渡，节奏点上最常用",
         "params": [
@@ -49,7 +77,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "whip",
         "label": "Whip 甩镜",
-        "category": "冲击",
+        "display_category": "冲击",
         "default_duration": 0.5,
         "description": "带模糊的快速横甩，短视频里出现频率最高",
         "params": [
@@ -61,7 +89,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "zoom",
         "label": "Zoom 缩放转场",
-        "category": "冲击",
+        "display_category": "冲击",
         "default_duration": 0.4,
         "description": "前一段推进、后一段拉出",
         "params": [
@@ -72,7 +100,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "wipe",
         "label": "Wipe 擦除",
-        "category": "几何",
+        "display_category": "几何",
         "default_duration": 0.5,
         "description": "沿方向用硬边擦过",
         "params": [
@@ -83,7 +111,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "slide",
         "label": "Slide 滑入",
-        "category": "几何",
+        "display_category": "几何",
         "default_duration": 0.5,
         "description": "新片段滑入，旧片段不动",
         "params": [
@@ -93,7 +121,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "push",
         "label": "Push 推移",
-        "category": "几何",
+        "display_category": "几何",
         "default_duration": 0.5,
         "description": "新片段把旧片段推出画面",
         "params": [
@@ -103,7 +131,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "spin",
         "label": "Spin 旋转转场",
-        "category": "风格",
+        "display_category": "风格",
         "default_duration": 0.5,
         "description": "旋转叠加缩放",
         "params": [
@@ -114,7 +142,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "blur",
         "label": "Blur 模糊转场",
-        "category": "风格",
+        "display_category": "风格",
         "default_duration": 0.5,
         "description": "两边都模糊到最大再恢复",
         "params": [
@@ -124,7 +152,7 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
     {
         "name": "glitch",
         "label": "Glitch 故障转场",
-        "category": "风格",
+        "display_category": "风格",
         "default_duration": 0.35,
         "description": "条带错位切换",
         "params": [
@@ -135,11 +163,32 @@ BUILTIN_TRANSITIONS: List[Dict[str, Any]] = [
 ]
 
 
-class TransitionLibrary:
-    """转场库。"""
+def _decorate(item: Dict[str, Any]) -> Dict[str, Any]:
+    """给内置转场补上标准分类 / renderer / supported_from / supported_to。
+
+    renderer 名一律等于 name —— 两侧靠这个字符串对接，
+    remotion/src/transitions/index.ts 注册的键必须与之一致。
+    """
+    item["category"] = _TRANSITION_CATEGORIES.get(item["name"], "basic")
+    item["renderer"] = item["name"]
+    item["supported_from"] = list(SUPPORTED_SIDES)
+    item["supported_to"] = list(SUPPORTED_SIDES)
+    return item
+
+
+for _item in BUILTIN_TRANSITIONS:
+    _decorate(_item)
+
+
+class TransitionLibrary(TransitionRegistry):
+    """转场库：内置定义 + assets/transitions 下的自定义 JSON。
+
+    继承 TransitionRegistry，所以同时具备 register / unregister / validate /
+    validate_pair / categories 等结构化能力。
+    """
 
     def __init__(self, assets_dir: str = "") -> None:
-        self._items: Dict[str, Dict[str, Any]] = {t["name"]: t for t in BUILTIN_TRANSITIONS}
+        super().__init__(BUILTIN_TRANSITIONS)
         if assets_dir:
             self._load_custom(os.path.join(assets_dir, "transitions"))
 
@@ -155,40 +204,27 @@ class TransitionLibrary:
             except (OSError, json.JSONDecodeError):
                 continue
             for item in data.get("transitions", []):
-                if item.get("name"):
-                    self._items[item["name"]] = item
+                self.register(item)
 
-    def all(self) -> List[Dict[str, Any]]:
-        return list(self._items.values())
-
-    def get(self, name: str) -> Optional[Dict[str, Any]]:
-        return self._items.get(name)
-
-    def has(self, name: str) -> bool:
-        return name in self._items
+    # ------------------------------------------------------------ 查询
 
     def label_of(self, name: str) -> str:
-        item = self._items.get(name)
-        return item.get("label", name) if item else name
+        item = self.get(name)
+        return item.display_name if item else name
 
     def default_params(self, name: str) -> Dict[str, Any]:
-        item = self._items.get(name)
-        if not item:
-            return {}
-        return {p["key"]: p["default"] for p in item.get("params", [])}
+        item = self.get(name)
+        return item.default_params() if item else {}
 
     def default_duration(self, name: str) -> float:
-        item = self._items.get(name)
-        return float(item.get("default_duration", 0.5)) if item else 0.5
+        item = self.get(name)
+        return item.default_duration if item else 0.5
 
     def param_spec(self, name: str, key: str) -> Optional[Dict[str, Any]]:
-        item = self._items.get(name)
-        if not item:
-            return None
-        for param in item.get("params", []):
-            if param.get("key") == key:
-                return param
-        return None
+        item = self.get(name)
+        return item.parameter(key) if item else None
 
-    def categories(self) -> List[str]:
-        return sorted({t.get("category", "") for t in self._items.values() if t.get("category")})
+    def display_categories(self) -> List[str]:
+        """GUI 库面板用的中文分组。"""
+        return sorted({t.display_category for t in self.all() if t.display_category})
+

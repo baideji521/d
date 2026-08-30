@@ -18,12 +18,19 @@
       "properties": {
         "key": { "type": "string" },
         "label": { "type": "string" },
-        "type": { "enum": ["number", "int", "bool", "enum", "color", "asset"] },
+        "type": {
+          "enum": [
+            "number", "int", "integer", "bool", "boolean",
+            "string", "str", "text", "enum", "color", "asset"
+          ],
+          "description": "integer/boolean/str/text 是别名，EffectRegistry 会归一化成 int/bool/string"
+        },
         "default": {},
         "min": { "type": "number" },
         "max": { "type": "number" },
         "step": { "type": "number" },
         "options": { "type": "array", "items": { "type": "string" } },
+        "ui": { "enum": ["slider", "spin", "checkbox", "combo", "color", "asset", "line"] },
         "asset_type": { "type": "string" },
         "hint": { "type": "string" }
       }
@@ -36,7 +43,24 @@
         "name": { "type": "string", "description": "写入 Timeline JSON 的稳定标识" },
         "label": { "type": "string", "description": "中文显示名" },
         "kind": { "enum": ["program", "material"] },
-        "category": { "type": "string" },
+        "category": {
+          "enum": ["geometry", "visual", "screen", "overlay", "audio"],
+          "description": "标准分类，按作用层面划分"
+        },
+        "display_category": { "type": "string", "description": "GUI 库面板的中文分组，纯展示用" },
+        "supported_targets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "可以作用于哪些元素 type。空数组 = 不能作为 type=effect 的 target"
+        },
+        "scope": {
+          "enum": ["element", "screen", "asset"],
+          "description": "element 改单个元素；screen 盖整屏（忽略 target）；asset 依赖素材文件"
+        },
+        "renderer": {
+          "type": "string",
+          "description": "Remotion 侧 EffectRendererRegistry 里注册的名字。空 = 尚无 renderer"
+        },
         "default_duration": { "type": "number", "exclusiveMinimum": 0 },
         "blend": { "enum": ["normal", "screen", "add"] },
         "description": { "type": "string" },

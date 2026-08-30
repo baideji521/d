@@ -99,6 +99,8 @@ export type Timeline = {
     height: number;
     duration?: number;
     background?: string;
+    /** 全局输出音量。缺省 = 1（原样输出），0 = 静音。 */
+    master_volume?: number;
   };
   tracks: Track[];
   elements: TimelineElement[];
@@ -127,6 +129,24 @@ export const toFrames = (seconds: number, fps: number): number =>
 /** 至少 1 帧，避免 durationInFrames=0 让 Remotion 报错。 */
 export const toDurationFrames = (seconds: number, fps: number): number =>
   Math.max(1, toFrames(seconds, fps));
+
+/**
+ * 全局输出音量（`meta.master_volume`）。
+ *
+ * 缺省即 1，所以稀疏 JSON 里没有这个字段时行为与以前完全一致。
+ * 上限 4 与元素级 volume 保持一致（schema 也是 0..4），负数按 0 处理。
+ */
+export const masterVolume = (timeline: Timeline): number => {
+  const raw = timeline.meta?.master_volume;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return 1;
+  }
+  return Math.max(0, Math.min(4, raw));
+};
+
+/** 元素音量 × 全局音量。两级音量只在这里相乘，避免各图层各写一遍。 */
+export const resolveVolume = (elementVolume: number, master: number): number =>
+  Math.max(0, elementVolume) * Math.max(0, master);
 
 export const applyEasing = (t: number, easing: Easing = "linear"): number => {
   const clamped = Math.min(1, Math.max(0, t));
@@ -264,6 +284,33 @@ export const trackZIndex = (timeline: Timeline, trackId?: string): number => {
 
 export const elementEnd = (element: TimelineElement): number =>
   (element.start ?? 0) + (element.duration ?? 0);
+
+/** 某个元素被哪些转场引用（作为 from 或 to）。 */
+export const transitionsFor = (
+  element: TimelineElement,
+  transitions: TimelineElement[],
+): TimelineElement[] =>
+  transitions.filter((t) => t.from === element.id || t.to === element.id);
+
+/**
+ * 此刻这个元素是否正被转场接管。
+ *
+ * 转场期间两侧画面由 TransitionLayer 统一混合，元素自己必须让位，
+ * 否则 fade / crossfade 会把不透明的原图垫在下面，混合结果就不对了。
+ *
+ * 但让位只限于转场那一小段时间窗 —— 以前的实现是把参与转场的片段
+ * 整体从渲染列表里剔除，结果转场窗口之外整条轨都是黑的。
+ */
+export const isCoveredByTransition = (
+  element: TimelineElement,
+  transitions: TimelineElement[],
+  now: number,
+): boolean =>
+  transitionsFor(element, transitions).some((t) => {
+    const start = t.start ?? 0;
+    return now >= start && now < start + (t.duration ?? 0);
+  });
+
 
 export const findElement = (
   timeline: Timeline,

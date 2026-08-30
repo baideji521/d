@@ -31,6 +31,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from core import sparse
+from core import timeline as tl
+
 
 class JsonPanel(QWidget):
     """JSON 显示 / 编辑 / 校验。"""
@@ -60,6 +63,12 @@ class JsonPanel(QWidget):
         self._edit_mode.setToolTip("勾选后可以直接改 JSON，点「应用 JSON」生效")
         self._edit_mode.toggled.connect(self._on_edit_mode)
 
+        self._only_selected = QCheckBox("只看选中")
+        self._only_selected.setToolTip(
+            "只显示选中元素的稀疏 JSON，并在右下角列出被省略的字段（省略 = 等于 Runtime 默认值）"
+        )
+        self._only_selected.toggled.connect(self._on_only_selected)
+
         self._apply_button = QPushButton("应用 JSON")
         self._apply_button.setEnabled(False)
         self._apply_button.clicked.connect(self._apply_editor_text)
@@ -85,6 +94,7 @@ class JsonPanel(QWidget):
         button_row = QHBoxLayout()
         button_row.setSpacing(4)
         button_row.addWidget(self._edit_mode)
+        button_row.addWidget(self._only_selected)
         button_row.addWidget(self._apply_button)
         button_row.addWidget(copy_button)
         button_row.addWidget(save_button)
@@ -122,6 +132,9 @@ class JsonPanel(QWidget):
         if self._edit_mode.isChecked():
             # 编辑模式下不覆盖用户正在改的文本
             return
+        if self._only_selected.isChecked():
+            self._show_inspector()
+            return
         text = self._model.to_json_text()
         scroll = self.editor.verticalScrollBar().value()
         self._syncing = True
@@ -131,6 +144,41 @@ class JsonPanel(QWidget):
         self._index_elements(text)
         self.validate(verbose=False)
         self._locate_element(self._model.selected_id)
+
+    def _on_only_selected(self, enabled: bool) -> None:
+        """Inspector 模式与编辑模式互斥：只看一个元素时改文本没法安全套回整条时间线。"""
+        if enabled and self._edit_mode.isChecked():
+            self._edit_mode.setChecked(False)
+        self._edit_mode.setEnabled(not enabled)
+        self.refresh()
+
+    def _show_inspector(self) -> None:
+        """只显示选中元素的稀疏 JSON，并把被省略的字段写在摘要里。
+
+        这里刻意**不**回填默认值：面板显示的就是会落盘的那一份。
+        想看补齐后的效果去看 `to_effective_dict()`，两者不能混在一个视图里，
+        否则用户会以为 JSON 里真有那些字段。
+        """
+        element_id = self._model.selected_id
+        element = self._model.element(element_id) if element_id else None
+        self._element_lines.clear()
+        self._syncing = True
+        if element is None:
+            self.editor.setPlainText("// 没有选中元素")
+            self._syncing = False
+            self._summary.setText("Inspector：先在时间线上选一个元素")
+            return
+        payload = sparse.sparse_element(element)
+        self.editor.setPlainText(json.dumps(payload, ensure_ascii=False, indent=2))
+        self._syncing = False
+        elided = sparse.elided_fields(element)
+        label = tl.ELEMENT_TYPE_LABELS.get(str(element.get("type", "")), element.get("type", ""))
+        summary = f'{element_id}（{label}）　字段 {len(payload)} 个'
+        if elided:
+            summary += f'　省略 {len(elided)} 项：{"、".join(elided)}'
+        else:
+            summary += "　没有可省略的字段"
+        self._summary.setText(summary)
 
     def _index_elements(self, text: str) -> None:
         """记录每个元素 id 出现在第几行，供定位使用。"""
@@ -150,6 +198,10 @@ class JsonPanel(QWidget):
 
     def _locate_element(self, element_id: str) -> None:
         """Timeline → JSON：把元素所在的 JSON 块高亮并滚到可见处。"""
+        if self._only_selected.isChecked():
+            # Inspector 模式下没有"整份 JSON"可定位，换选中就整块重画
+            self._show_inspector()
+            return
         self.editor.setExtraSelections([])
         if not element_id or element_id not in self._element_lines:
             return

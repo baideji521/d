@@ -13,6 +13,11 @@
       "description": "start 不得小于 0"
     },
     {
+      "id": "RULE_TIME_003",
+      "level": "error",
+      "description": "start / duration 不得超过 86400 秒（24 小时），否则 Runtime 会算出渲染不完的帧数"
+    },
+    {
       "id": "RULE_VIDEO_001",
       "level": "error",
       "description": "source.end 不得超过源视频长度"
@@ -48,6 +53,26 @@
       "description": "Transition 时长不得超过任一相邻 Clip 时长的一半"
     },
     {
+      "id": "RULE_TRANSITION_004",
+      "level": "error",
+      "description": "Transition 的 name 必须已在 TransitionRegistry 注册"
+    },
+    {
+      "id": "RULE_TRANSITION_005",
+      "level": "error",
+      "description": "Transition 两侧元素类型必须在 supported_from / supported_to 内"
+    },
+    {
+      "id": "RULE_TRANSITION_006",
+      "level": "error",
+      "description": "Transition 的 params 必须符合 TransitionRegistry 声明的类型与取值范围"
+    },
+    {
+      "id": "RULE_TRANSITION_007",
+      "level": "warning",
+      "description": "Transition 的 params 里存在参数表之外的键，渲染时会被忽略"
+    },
+    {
       "id": "RULE_ASSET_001",
       "level": "error",
       "description": "所有 asset 必须存在于 Asset Library"
@@ -68,6 +93,16 @@
       "description": "元素类型应与轨道类型匹配（视频元素放视频轨、音频元素放音频轨）"
     },
     {
+      "id": "RULE_TRACK_003",
+      "level": "warning",
+      "description": "需要落轨的元素必须写 track，否则时间轴上看不见它、Z 序也没有依据"
+    },
+    {
+      "id": "RULE_NUMBER_001",
+      "level": "error",
+      "description": "所有数值字段必须是有限数字，不允许 NaN / Infinity"
+    },
+    {
       "id": "RULE_CAPTION_001",
       "level": "error",
       "description": "Caption 必须存在 text 或 words"
@@ -85,12 +120,32 @@
     {
       "id": "RULE_EFFECT_001",
       "level": "error",
-      "description": "Effect 的 name 必须存在于 Effect Library"
+      "description": "Effect 的 name 必须已在 EffectRegistry 注册"
     },
     {
       "id": "RULE_EFFECT_002",
       "level": "warning",
       "description": "Effect 的 target 若指定，必须指向已存在的元素"
+    },
+    {
+      "id": "RULE_EFFECT_003",
+      "level": "error",
+      "description": "Effect 的 target 元素类型必须在该特效的 supported_targets 内"
+    },
+    {
+      "id": "RULE_EFFECT_004",
+      "level": "error",
+      "description": "Effect 的 params 必须符合 EffectRegistry 声明的类型与取值范围"
+    },
+    {
+      "id": "RULE_EFFECT_005",
+      "level": "warning",
+      "description": "Effect 的 params 里存在参数表之外的键，渲染时会被忽略"
+    },
+    {
+      "id": "RULE_EFFECT_006",
+      "level": "error",
+      "description": "素材特效（kind=material）必须写成 type=overlay，不能作为 type=effect 的 name"
     },
     {
       "id": "RULE_FREEZE_001",

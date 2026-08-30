@@ -18,13 +18,22 @@
 - 校验不通过的元素描红边/黄边
 
 显示顺序：tracks 列表越靠后越上层，所以画布自上而下用 reversed(tracks)。
+
+阶段 7 的三条结构性约束（细节见 docs/GUI_TIMELINE_INTERACTION_AUDIT.md）：
+
+1. **坐标只有一个真相源**：所有时间↔像素↔轨道换算走 `gui/timeline_coordinate.TimelineCoordinate`，
+   本文件里不允许再出现 `seconds * pps` 或 `x / pps`。
+2. **手势期间捏坐标快照**：`TimelineInteraction` 在按下那一刻拿到一份 TimelineCoordinate，
+   之后视图被任何信号滚走都不影响 grab_offset —— 修掉"点中间被当成点边缘"。
+3. **一次手势只落库一次**：拖动过程只画 ghost，松手才调 `TimelineModel.move_element /
+   resize_element`。这样撤销栈一次拖动一步，也不会每个 mouseMove 触发全量校验。
 """
 
 from __future__ import annotations
 
 import json
-import math
-from typing import Any, Dict, List, Optional, Tuple
+import os
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PyQt5.QtCore import QMimeData, QPoint, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt5.QtGui import (
@@ -38,32 +47,47 @@ from PyQt5.QtGui import (
 )
 from PyQt5.QtWidgets import (
     QAbstractScrollArea,
+    QComboBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QMenu,
-    QScrollBar,
     QSizePolicy,
     QSlider,
     QToolButton,
     QWidget,
 )
 
+from core import markers as marker_utils
 from core import timeline as tl
-from core.time_utils import format_timecode
+from core.time_utils import DEFAULT_FPS, format_timecode
 from gui import shortcuts
+from gui.timeline_coordinate import (
+    DEFAULT_PPS,
+    EDGE_ZONE,
+    PERCENT_STEPS,
+    ROW_GAP,
+    ROW_HEIGHT,
+    Rect,
+
+    TimelineCoordinate,
+    TimelineZoom,
+)
+from gui.timeline_interaction import (
+    DropCommit,
+    InteractionMode,
+    MoveCommit,
+    ResizeCommit,
+    TimelineInteraction,
+)
+from gui.timeline_snap import SnapEngine
 
 MIME_TYPE = "application/x-ai-timeline-item"
 
-HEADER_WIDTH = 168
-RULER_HEIGHT = 26
-ROW_HEIGHT = 38
-ROW_GAP = 2
-MIN_PPS = 8.0
-MAX_PPS = 600.0
-EDGE_GRAB = 6
-# 磁吸容差（像素）。按像素算，缩放后手感一致
-SNAP_PIXELS = 8
+HEADER_WIDTH = 176
+RULER_HEIGHT = 30
+
+#: 外部文件拖进来时还不知道时长，ghost 先按这个秒数画（落库时由主窗口按真实素材算）。
+UNKNOWN_DROP_SECONDS = 3.0
 
 # 元素类型 -> (填充色, 边框色)
 TYPE_COLORS = {
@@ -105,22 +129,46 @@ def read_drag_payload(mime: QMimeData) -> Optional[Dict[str, Any]]:
         return None
 
 
-class ViewState:
-    """缩放与滚动的共享状态。"""
+def _to_qrect(rect: Rect) -> QRectF:
+    return QRectF(rect.x, rect.y, rect.width, rect.height)
 
-    def __init__(self) -> None:
-        self.pixels_per_second = 60.0
+
+class ViewState:
+    """视图状态：缩放 + 滚动 + 轨道显示序。
+
+    它自己**不做换算**，唯一职责是产出 `TimelineCoordinate` 快照。
+    这样"当前视图"与"手势用的坐标"可以是两份，互不干扰。
+    """
+
+    def __init__(self, model) -> None:
+        self._model = model
+        self.zoom = TimelineZoom(DEFAULT_PPS)
         self.scroll_x = 0.0
         self.scroll_y = 0.0
 
-    def x_for_time(self, seconds: float) -> float:
-        return seconds * self.pixels_per_second - self.scroll_x
+    # 兼容旧调用点：读写 pixels_per_second 等价于操作 TimelineZoom
+    @property
+    def pixels_per_second(self) -> float:
+        return self.zoom.pixels_per_second
 
-    def time_for_x(self, x: float) -> float:
-        return max(0.0, (x + self.scroll_x) / self.pixels_per_second)
+    @pixels_per_second.setter
+    def pixels_per_second(self, value: float) -> None:
+        self.zoom.set_zoom(value)
 
-    def width_for_duration(self, seconds: float) -> float:
-        return max(1.0, seconds * self.pixels_per_second)
+    def display_tracks(self) -> List[Dict[str, Any]]:
+        return list(reversed(self._model.tracks()))
+
+    def coord(self) -> TimelineCoordinate:
+        return TimelineCoordinate(
+            pixels_per_second=self.zoom.pixels_per_second,
+            timeline_origin_x=0.0,
+            scroll_x=self.scroll_x,
+            scroll_y=self.scroll_y,
+            fps=float(getattr(self._model, "fps", DEFAULT_FPS) or DEFAULT_FPS),
+            row_height=ROW_HEIGHT,
+            row_gap=ROW_GAP,
+            track_order=tuple(str(t.get("id", "")) for t in self.display_tracks()),
+        )
 
 
 class RulerCanvas(QWidget):
@@ -142,52 +190,69 @@ class RulerCanvas(QWidget):
         painter.setPen(QPen(QColor("#39424f")))
         painter.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
 
-        pps = self._view.pixels_per_second
-        # 根据缩放挑一个人能看懂的刻度间隔
-        for step in (0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0):
-            if step * pps >= 62:
-                break
-        start_time = self._view.time_for_x(0)
-        end_time = self._view.time_for_x(self.width())
+        coord = self._view.coord()
+        step = coord.tick_step()
 
         font = QFont("Consolas")
         font.setPointSize(7)
         painter.setFont(font)
 
-        index = int(start_time / step)
-        while True:
-            seconds = index * step
-            if seconds > end_time + step:
-                break
-            x = self._view.x_for_time(seconds)
+        for seconds in coord.visible_ticks(self.width()):
+            x = coord.time_to_x(seconds)
             painter.setPen(QPen(QColor("#5b687a")))
-            painter.drawLine(int(x), self.height() - 8, int(x), self.height())
+            painter.drawLine(int(x), self.height() - 9, int(x), self.height())
             painter.setPen(QPen(QColor("#9aa8bb")))
-            painter.drawText(int(x) + 3, 12, format_timecode(seconds))
+            painter.drawText(int(x) + 3, 13, format_timecode(seconds))
             # 中间再补一条细分线
-            mid_x = self._view.x_for_time(seconds + step / 2)
+            mid_x = coord.time_to_x(seconds + step / 2)
             painter.setPen(QPen(QColor("#3c4552")))
-            painter.drawLine(int(mid_x), self.height() - 4, int(mid_x), self.height())
-            index += 1
+            painter.drawLine(int(mid_x), self.height() - 5, int(mid_x), self.height())
 
-        playhead_x = self._view.x_for_time(self._model.playhead)
+        self._paint_markers(painter, coord)
+
+        playhead_x = coord.time_to_x(self._model.playhead)
         painter.setPen(QPen(QColor("#ff5f56"), 2))
         painter.drawLine(int(playhead_x), 0, int(playhead_x), self.height())
         painter.setBrush(QBrush(QColor("#ff5f56")))
         painter.setPen(Qt.NoPen)
         painter.drawPolygon(
-            QPoint(int(playhead_x) - 5, 0),
-            QPoint(int(playhead_x) + 5, 0),
-            QPoint(int(playhead_x), 8),
+            QPoint(int(playhead_x) - 6, 0),
+            QPoint(int(playhead_x) + 6, 0),
+            QPoint(int(playhead_x), 9),
         )
         painter.end()
 
+    def _paint_markers(self, painter: QPainter, coord: TimelineCoordinate) -> None:
+        """标记旗标。颜色按标记类型走 core/markers.py，不在这里另起一套配色。"""
+        for marker in self._model.markers():
+            x = coord.time_to_x(float(marker.get("time", 0.0)))
+            if x < -12 or x > self.width() + 12:
+                continue
+            color = QColor(marker_utils.type_color(str(marker.get("type", ""))))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(color))
+            # 旗杆在左、旗面朝右：旗杆正好压在标记时间上，不会让人误判 ±几像素
+            painter.drawRect(int(x), 2, 2, self.height() - 4)
+            painter.drawPolygon(
+                QPoint(int(x) + 2, 2),
+                QPoint(int(x) + 12, 6),
+                QPoint(int(x) + 2, 10),
+            )
+            label = str(marker.get("label") or "")
+            if label:
+                painter.setPen(QPen(color))
+                painter.drawText(int(x) + 15, 10, label)
+
+    def _time_at(self, x: int) -> float:
+        coord = self._view.coord()
+        return coord.snap_time(coord.clamp_time(coord.x_to_time(x)))
+
     def mousePressEvent(self, event) -> None:  # noqa: N802
-        self.playheadRequested.emit(self._view.time_for_x(event.pos().x()))
+        self.playheadRequested.emit(self._time_at(event.pos().x()))
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802
         if event.buttons() & Qt.LeftButton:
-            self.playheadRequested.emit(self._view.time_for_x(event.pos().x()))
+            self.playheadRequested.emit(self._time_at(event.pos().x()))
 
 
 class HeaderCanvas(QWidget):
@@ -204,12 +269,20 @@ class HeaderCanvas(QWidget):
         self.setFixedWidth(HEADER_WIDTH)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         self._buttons: List[Tuple[QRect, str, str]] = []  # (区域, 轨道 id, 动作)
+        self._drop_track = ""
+
+    def set_drop_track(self, track_id: str) -> None:
+        """拖放期间高亮目标轨道（第十一条）。"""
+        if track_id == self._drop_track:
+            return
+        self._drop_track = track_id or ""
+        self.update()
 
     def display_tracks(self) -> List[Dict[str, Any]]:
-        return list(reversed(self._model.tracks()))
+        return self._view.display_tracks()
 
     def content_height(self) -> int:
-        return len(self._model.tracks()) * (ROW_HEIGHT + ROW_GAP)
+        return int(self._view.coord().content_height())
 
     def sizeHint(self) -> QSize:  # noqa: N802
         return QSize(HEADER_WIDTH, self.content_height())
@@ -218,25 +291,34 @@ class HeaderCanvas(QWidget):
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor("#141821"))
         self._buttons.clear()
+        coord = self._view.coord()
 
         font = QFont()
         font.setPointSize(8)
         painter.setFont(font)
         metrics = QFontMetrics(font)
 
-        for index, track in enumerate(self.display_tracks()):
-            top = index * (ROW_HEIGHT + ROW_GAP) - int(self._view.scroll_y)
+        for track in self.display_tracks():
+            track_id = str(track.get("id", ""))
+            top_f = coord.track_to_y(track_id)
+            if top_f is None:
+                continue
+            top = int(top_f)
             if top + ROW_HEIGHT < 0 or top > self.height():
                 continue
-            row = QRect(0, top, HEADER_WIDTH - 1, ROW_HEIGHT)
+            row = QRect(0, top, HEADER_WIDTH - 1, int(ROW_HEIGHT))
             painter.fillRect(row, QColor(TRACK_KIND_COLORS.get(track.get("kind"), "#232a36")))
-            painter.setPen(QPen(QColor("#2f3846")))
+            if track_id == self._drop_track:
+                painter.fillRect(row, QColor(127, 178, 255, 46))
+                painter.setPen(QPen(QColor("#7fb2ff"), 2))
+            else:
+                painter.setPen(QPen(QColor("#2f3846")))
             painter.drawRect(row)
 
-            name = track.get("name", track.get("id", ""))
+            name = track.get("name", track_id)
             painter.setPen(QPen(QColor("#7f8a99") if track.get("hidden") else QColor("#dfe6ef")))
             painter.drawText(
-                QRect(8, top, HEADER_WIDTH - 74, ROW_HEIGHT),
+                QRect(8, top, HEADER_WIDTH - 74, int(ROW_HEIGHT)),
                 Qt.AlignVCenter | Qt.AlignLeft,
                 metrics.elidedText(name, Qt.ElideRight, HEADER_WIDTH - 78),
             )
@@ -244,15 +326,16 @@ class HeaderCanvas(QWidget):
             # Z 序提示：数字越大越上层
             painter.setPen(QPen(QColor("#5f6b7c")))
             painter.drawText(
-                QRect(8, top + ROW_HEIGHT - 14, 60, 12),
+                QRect(8, top + int(ROW_HEIGHT) - 15, 90, 13),
                 Qt.AlignLeft,
-                f"Z {tl.track_z_index(self._model.timeline, track.get('id'))}",
+                f"Z {tl.track_z_index(self._model.timeline, track_id)}"
+                + ("　← 可放入" if track_id == self._drop_track else ""),
             )
 
-            self._draw_button(painter, row, 0, "🔒" if track.get("locked") else "🔓", track["id"], "locked")
-            self._draw_button(painter, row, 1, "🙈" if track.get("hidden") else "👁", track["id"], "hidden")
-            self._draw_button(painter, row, 2, "▲", track["id"], "up")
-            self._draw_button(painter, row, 3, "▼", track["id"], "down")
+            self._draw_button(painter, row, 0, "🔒" if track.get("locked") else "🔓", track_id, "locked")
+            self._draw_button(painter, row, 1, "🙈" if track.get("hidden") else "👁", track_id, "hidden")
+            self._draw_button(painter, row, 2, "▲", track_id, "up")
+            self._draw_button(painter, row, 3, "▼", track_id, "down")
         painter.end()
 
     def _draw_button(
@@ -264,9 +347,9 @@ class HeaderCanvas(QWidget):
         track_id: str,
         action: str,
     ) -> None:
-        size = 16
+        size = 18
         x = HEADER_WIDTH - 8 - (4 - slot) * (size + 2)
-        y = row.top() + (ROW_HEIGHT - size) // 2
+        y = row.top() + (int(ROW_HEIGHT) - size) // 2
         rect = QRect(x, y, size, size)
         painter.setPen(QPen(QColor("#4a5566")))
         painter.setBrush(QBrush(QColor("#1c222c")))
@@ -277,7 +360,7 @@ class HeaderCanvas(QWidget):
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.RightButton:
-            track_id = self._track_at(event.pos().y())
+            track_id = self._view.coord().y_to_track(event.pos().y())
             if track_id:
                 self.trackContextRequested.emit(track_id, event.globalPos())
             return
@@ -291,13 +374,6 @@ class HeaderCanvas(QWidget):
                     self.trackMoveRequested.emit(track_id, -1)
                 return
 
-    def _track_at(self, y: int) -> str:
-        index = int((y + self._view.scroll_y) // (ROW_HEIGHT + ROW_GAP))
-        tracks = self.display_tracks()
-        if 0 <= index < len(tracks):
-            return tracks[index].get("id", "")
-        return ""
-
 
 class TrackCanvas(QWidget):
     """轨道内容：元素块的绘制与全部鼠标交互。"""
@@ -310,134 +386,61 @@ class TrackCanvas(QWidget):
     filesDropped = pyqtSignal(list, str, float)
     playheadRequested = pyqtSignal(float)
     zoomChanged = pyqtSignal()
-
+    dropTrackChanged = pyqtSignal(str)
+    statusMessage = pyqtSignal(str)
 
     def __init__(self, model, view: ViewState, parent=None) -> None:
         super().__init__(parent)
         self._model = model
         self._view = view
         self._issues: Dict[str, str] = {}
-        self._drag_mode = ""  # move / trim_left / trim_right / rubber
-        self._drag_id = ""
-        self._drag_origin = QPoint()
-        self._drag_start_time = 0.0
-        self._drag_start_duration = 0.0
-        self._drag_track = ""
-        self._drag_copy_done = False  # Alt 拖动只在第一次移动时复制
+        self._interaction = TimelineInteraction(SnapEngine(enabled=True))
         self._hover_id = ""
         self._rubber = QRect()  # 框选矩形
-        self._snap_enabled = True
-        self._snap_line: Optional[float] = None  # 正在吸附的时间点，用来画提示线
+        self._rubber_active = False
+        self._alt_copy = False
+        self._drop_info: Optional[Callable[[Dict[str, Any]], Tuple[str, float, str]]] = None
         self.setMouseTracking(True)
         self.setAcceptDrops(True)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-    # ------------------------------------------------------------ 磁吸
+    # ------------------------------------------------------------ 外部接线
+
+    def set_drop_info_provider(
+        self, provider: Optional[Callable[[Dict[str, Any]], Tuple[str, float, str]]]
+    ) -> None:
+        """主窗口注入"这个 payload 会变成什么元素、多长、叫什么"，
+        ghost 才能按真实时长画。控件本身不认识素材库。"""
+        self._drop_info = provider
 
     def set_snap_enabled(self, enabled: bool) -> None:
-        self._snap_enabled = bool(enabled)
+        self._interaction.snap.enabled = bool(enabled)
         self.update()
 
     def snap_enabled(self) -> bool:
-        return self._snap_enabled
-
-    def _snap_targets(self, exclude_ids: List[str]) -> List[float]:
-        """可以吸附的时间点：0、播放头、其它元素的首尾。"""
-        targets = [0.0, float(self._model.playhead)]
-        for element in self._model.elements():
-            if element.get("id") in exclude_ids:
-                continue
-            start = float(element.get("start", 0.0))
-            targets.append(start)
-            targets.append(round(start + float(element.get("duration", 0.0)), 6))
-        return targets
-
-    def _snap_time(self, seconds: float, exclude_ids: List[str]) -> float:
-        """把时间吸到最近的目标点上。容差按像素算，缩放后手感一致。"""
-        self._snap_line = None
-        if not self._snap_enabled:
-            return seconds
-        tolerance = SNAP_PIXELS / max(1e-6, self._view.pixels_per_second)
-        best = seconds
-        best_gap = tolerance
-        for target in self._snap_targets(exclude_ids):
-            gap = abs(target - seconds)
-            if gap < best_gap:
-                best_gap = gap
-                best = target
-        if best != seconds:
-            self._snap_line = best
-        return best
-
-    def _snap_move(self, new_start: float, duration: float, exclude_ids: List[str]) -> float:
-        """移动时首尾都参与吸附，取更近的一边。"""
-        if not self._snap_enabled:
-            return new_start
-        snapped_start = self._snap_time(new_start, exclude_ids)
-        line_for_start = self._snap_line
-        snapped_end = self._snap_time(new_start + duration, exclude_ids)
-        line_for_end = self._snap_line
-        gap_start = abs(snapped_start - new_start)
-        gap_end = abs(snapped_end - (new_start + duration))
-        if line_for_start is not None and (line_for_end is None or gap_start <= gap_end):
-            self._snap_line = line_for_start
-            return snapped_start
-        if line_for_end is not None:
-            self._snap_line = line_for_end
-            return max(0.0, snapped_end - duration)
-        self._snap_line = None
-        return new_start
-
-
-    # ------------------------------------------------------------ 布局计算
+        return self._interaction.snap.enabled
 
     def set_issues(self, issues: Dict[str, str]) -> None:
         self._issues = issues
         self.update()
 
+    def gesture_active(self) -> bool:
+        return self._interaction.active
+
+    # ------------------------------------------------------------ 布局计算
+
+    def coord(self) -> TimelineCoordinate:
+        return self._view.coord()
+
     def display_tracks(self) -> List[Dict[str, Any]]:
-        return list(reversed(self._model.tracks()))
+        return self._view.display_tracks()
 
     def content_height(self) -> int:
-        return len(self._model.tracks()) * (ROW_HEIGHT + ROW_GAP)
+        return int(self.coord().content_height())
 
     def content_width(self) -> float:
-        duration = max(self._model.duration, 10.0)
-        return (duration + 4.0) * self._view.pixels_per_second
-
-    def _row_top(self, track_id: str) -> Optional[int]:
-        for index, track in enumerate(self.display_tracks()):
-            if track.get("id") == track_id:
-                return index * (ROW_HEIGHT + ROW_GAP) - int(self._view.scroll_y)
-        return None
-
-    def _track_at_y(self, y: int) -> str:
-        index = int((y + self._view.scroll_y) // (ROW_HEIGHT + ROW_GAP))
-        tracks = self.display_tracks()
-        if 0 <= index < len(tracks):
-            return tracks[index].get("id", "")
-        return ""
-
-    def _element_rect(self, element: Dict[str, Any]) -> Optional[QRectF]:
-        top = self._row_top(element.get("track", ""))
-        if top is None:
-            return None
-        x = self._view.x_for_time(float(element.get("start", 0.0)))
-        width = self._view.width_for_duration(float(element.get("duration", 0.0)))
-        return QRectF(x, top + 2, width, ROW_HEIGHT - 4)
-
-    def _element_at(self, pos: QPoint) -> Optional[Dict[str, Any]]:
-        """从上层往下找，保证重叠时选到视觉上在前面的那个。"""
-        track_id = self._track_at_y(pos.y())
-        if not track_id:
-            return None
-        candidates = [e for e in self._model.elements() if e.get("track") == track_id]
-        for element in reversed(candidates):
-            rect = self._element_rect(element)
-            if rect and rect.contains(pos.x(), pos.y()):
-                return element
-        return None
+        return self.coord().content_width(self._model.duration)
 
     # ------------------------------------------------------------ 绘制
 
@@ -445,88 +448,88 @@ class TrackCanvas(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.fillRect(self.rect(), QColor("#0f131a"))
+        coord = self.coord()
 
-        self._paint_rows(painter)
-        self._paint_grid(painter)
-        self._paint_elements(painter)
-        self._paint_playhead(painter)
-        self._paint_snap_line(painter)
+        self._paint_rows(painter, coord)
+        self._paint_grid(painter, coord)
+        self._paint_elements(painter, coord)
+        self._paint_ghost(painter)
+        self._paint_playhead(painter, coord)
+        self._paint_snap_guide(painter)
         self._paint_rubber(painter)
         painter.end()
 
-    def _paint_snap_line(self, painter: QPainter) -> None:
-        """吸附提示线：让用户知道刚才是「吸上去了」而不是自己拖准了。"""
-        if self._snap_line is None:
-            return
-        x = int(self._view.x_for_time(self._snap_line))
-        painter.setPen(QPen(QColor("#ffe347"), 1, Qt.DashLine))
-        painter.drawLine(x, 0, x, self.height())
+    def _preview_track(self) -> str:
+        preview = self._interaction.preview
+        return preview.track_id if preview is not None else ""
 
-    def _paint_rubber(self, painter: QPainter) -> None:
-        if self._rubber.isNull() or self._drag_mode != "rubber":
-            return
-        painter.setPen(QPen(QColor("#7fb2ff"), 1, Qt.DashLine))
-        painter.setBrush(QBrush(QColor(127, 178, 255, 40)))
-        painter.drawRect(self._rubber)
-
-
-    def _paint_rows(self, painter: QPainter) -> None:
-        for index, track in enumerate(self.display_tracks()):
-            top = index * (ROW_HEIGHT + ROW_GAP) - int(self._view.scroll_y)
+    def _paint_rows(self, painter: QPainter, coord: TimelineCoordinate) -> None:
+        drop_track = self._preview_track()
+        for track in self.display_tracks():
+            track_id = str(track.get("id", ""))
+            top_f = coord.track_to_y(track_id)
+            if top_f is None:
+                continue
+            top = int(top_f)
             if top + ROW_HEIGHT < 0 or top > self.height():
                 continue
             color = QColor(TRACK_KIND_COLORS.get(track.get("kind"), "#232a36"))
             color.setAlpha(90 if not track.get("hidden") else 40)
-            painter.fillRect(QRect(0, top, self.width(), ROW_HEIGHT), color)
+            painter.fillRect(QRect(0, top, self.width(), int(ROW_HEIGHT)), color)
+            if track_id and track_id == drop_track:
+                # Drop Zone：目标轨道整行高亮 + 蓝框，别让用户靠猜
+                painter.fillRect(QRect(0, top, self.width(), int(ROW_HEIGHT)), QColor(127, 178, 255, 34))
+                painter.setPen(QPen(QColor("#7fb2ff"), 1, Qt.DashLine))
+                painter.drawRect(QRect(0, top, self.width() - 1, int(ROW_HEIGHT) - 1))
             if track.get("locked"):
                 painter.setPen(QPen(QColor("#3a4454"), 1, Qt.DotLine))
-                painter.drawRect(QRect(0, top, self.width() - 1, ROW_HEIGHT))
+                painter.drawRect(QRect(0, top, self.width() - 1, int(ROW_HEIGHT)))
 
-    def _paint_grid(self, painter: QPainter) -> None:
-        pps = self._view.pixels_per_second
-        for step in (0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0):
-            if step * pps >= 62:
-                break
-        start_time = self._view.time_for_x(0)
-        end_time = self._view.time_for_x(self.width())
+    def _paint_grid(self, painter: QPainter, coord: TimelineCoordinate) -> None:
         painter.setPen(QPen(QColor("#1c222c")))
-        index = int(start_time / step)
-        while index * step <= end_time + step:
-            x = int(self._view.x_for_time(index * step))
+        for seconds in coord.visible_ticks(self.width()):
+            x = int(coord.time_to_x(seconds))
             painter.drawLine(x, 0, x, self.height())
-            index += 1
 
-    def _paint_elements(self, painter: QPainter) -> None:
+    def _paint_elements(self, painter: QPainter, coord: TimelineCoordinate) -> None:
         font = QFont()
         font.setPointSize(8)
         painter.setFont(font)
         metrics = QFontMetrics(font)
         selected = set(self._model.selection())
         primary = self._model.selected_id
+        dragging = self._interaction.dragging_element_id
 
         for element in self._model.elements():
-            rect = self._element_rect(element)
-            if rect is None or rect.right() < 0 or rect.left() > self.width():
+            box = coord.element_to_rect(element)
+            if box is None or box.right < 0 or box.left > self.width():
                 continue
-            etype = element.get("type", "")
+            rect = _to_qrect(box)
+            etype = str(element.get("type", ""))
+            element_id = str(element.get("id", ""))
             fill_hex, edge_hex = TYPE_COLORS.get(etype, ("#3f4a5a", "#8f9aab"))
 
             gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
             base = QColor(fill_hex)
+            if element_id == dragging:
+                # 正在拖的原件画淡一点，ghost 才是主角
+                base = base.darker(150)
             gradient.setColorAt(0.0, base.lighter(118))
             gradient.setColorAt(1.0, base.darker(112))
             painter.setBrush(QBrush(gradient))
 
-            issue = self._issues.get(element.get("id", ""))
+            issue = self._issues.get(element_id)
             if issue == "error":
                 painter.setPen(QPen(QColor("#ff5f56"), 2))
             elif issue == "warning":
                 painter.setPen(QPen(QColor("#ffbd2e"), 2))
-            elif element.get("id") == primary:
+            elif element_id == primary:
                 painter.setPen(QPen(QColor("#ffffff"), 2))
-            elif element.get("id") in selected:
+            elif element_id in selected:
                 # 多选里的非主选中，用偏蓝的粗边区分
                 painter.setPen(QPen(QColor("#7fb2ff"), 2))
+            elif element_id == self._hover_id:
+                painter.setPen(QPen(QColor(edge_hex).lighter(130), 2))
             else:
                 painter.setPen(QPen(QColor(edge_hex), 1))
             painter.drawRoundedRect(rect, 4, 4)
@@ -536,9 +539,9 @@ class TrackCanvas(QWidget):
                 painter.save()
                 painter.setClipRect(rect)
                 painter.setPen(QPen(QColor(255, 255, 255, 40), 1))
-                stripe = int(rect.left()) - ROW_HEIGHT
+                stripe = int(rect.left()) - int(ROW_HEIGHT)
                 while stripe < rect.right():
-                    painter.drawLine(stripe, int(rect.bottom()), stripe + ROW_HEIGHT, int(rect.top()))
+                    painter.drawLine(stripe, int(rect.bottom()), stripe + int(ROW_HEIGHT), int(rect.top()))
                     stripe += 7
                 painter.restore()
 
@@ -547,7 +550,7 @@ class TrackCanvas(QWidget):
             if keyframes:
                 painter.setPen(Qt.NoPen)
                 painter.setBrush(QBrush(QColor("#ffe347")))
-                duration = max(1e-6, float(element.get("duration", 0.0)))
+                duration = max(1e-6, float(element.get("duration", 0.0) or 0.0))
                 for points in keyframes.values():
                     for point in points:
                         ratio = min(1.0, max(0.0, float(point.get("time", 0.0)) / duration))
@@ -555,13 +558,84 @@ class TrackCanvas(QWidget):
                         painter.drawEllipse(QRectF(kx - 2, rect.bottom() - 5, 4, 4))
 
             if rect.width() > 26:
+                inner = QRectF(rect.left() + 6, rect.top(), rect.width() - 12, rect.height())
                 painter.setPen(QPen(QColor("#f2f6fb")))
-                label = self._element_label(element)
                 painter.drawText(
-                    QRectF(rect.left() + 6, rect.top(), rect.width() - 12, rect.height()),
+                    QRectF(inner.left(), inner.top() + 1, inner.width(), inner.height() / 2),
                     Qt.AlignVCenter | Qt.AlignLeft,
-                    metrics.elidedText(label, Qt.ElideRight, int(rect.width()) - 12),
+                    metrics.elidedText(self._element_label(element), Qt.ElideRight, int(inner.width())),
                 )
+                # 第三十五条：片段上要能直接看到时长
+                painter.setPen(QPen(QColor("#c2cfdf")))
+                painter.drawText(
+                    QRectF(inner.left(), inner.top() + inner.height() / 2, inner.width(), inner.height() / 2),
+                    Qt.AlignVCenter | Qt.AlignLeft,
+                    f"{float(element.get('duration', 0.0) or 0.0):.2f}s",
+                )
+
+            # Resize 手柄：选中或悬停时画出来，告诉用户这里能拉
+            if (element_id in selected or element_id == self._hover_id) and rect.width() >= EDGE_ZONE * 3:
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QBrush(QColor(255, 255, 255, 120)))
+                for hx in (rect.left() + 2, rect.right() - 4):
+                    painter.drawRect(QRectF(hx, rect.top() + 4, 2, rect.height() - 8))
+
+    def _paint_ghost(self, painter: QPainter) -> None:
+        """拖动 / 拖入过程中的 Ghost Clip（第十二条）。"""
+        preview = self._interaction.preview
+        coord = self._interaction.coordinate()
+        if preview is None or coord is None or not preview.track_id:
+            return
+        top = coord.track_to_y(preview.track_id)
+        if top is None:
+            return
+        x = coord.time_to_x(preview.start)
+        width = max(2.0, coord.duration_to_width(preview.duration))
+        rect = QRectF(x, top + 2.0, width, ROW_HEIGHT - 4.0)
+
+        edge = QColor("#7fb2ff") if preview.valid else QColor("#ff5f56")
+        painter.setBrush(QBrush(QColor(127, 178, 255, 60) if preview.valid else QColor(255, 95, 86, 60)))
+        painter.setPen(QPen(edge, 2, Qt.DashLine))
+        painter.drawRoundedRect(rect, 4, 4)
+
+        font = QFont()
+        font.setPointSize(8)
+        painter.setFont(font)
+        painter.setPen(QPen(QColor("#f2f6fb")))
+        text = f"{preview.label}　{preview.start:.2f}s → {preview.end:.2f}s（{preview.duration:.2f}s）"
+        if not preview.valid and preview.reason:
+            text = f"✕ {preview.reason}"
+        painter.drawText(
+            QRectF(rect.left() + 6, rect.top(), max(120.0, rect.width() - 12), rect.height()),
+            Qt.AlignVCenter | Qt.AlignLeft,
+            text,
+        )
+
+    def _paint_snap_guide(self, painter: QPainter) -> None:
+        """吸附提示线 + 标签：让用户知道"为什么突然吸到这里"（第九条）。"""
+        preview = self._interaction.preview
+        coord = self._interaction.coordinate()
+        if preview is None or coord is None or preview.snap_time is None:
+            return
+        x = int(coord.time_to_x(preview.snap_time))
+        painter.setPen(QPen(QColor("#ffe347"), 1, Qt.DashLine))
+        painter.drawLine(x, 0, x, self.height())
+        painter.setPen(QPen(QColor("#ffe347")))
+        font = QFont()
+        font.setPointSize(7)
+        painter.setFont(font)
+        painter.drawText(
+            QRectF(x + 4, 2, 220, 14),
+            Qt.AlignVCenter | Qt.AlignLeft,
+            f"{preview.snap_time:.2f}s　{preview.snap_label}",
+        )
+
+    def _paint_rubber(self, painter: QPainter) -> None:
+        if self._rubber.isNull() or not self._rubber_active:
+            return
+        painter.setPen(QPen(QColor("#7fb2ff"), 1, Qt.DashLine))
+        painter.setBrush(QBrush(QColor(127, 178, 255, 40)))
+        painter.drawRect(self._rubber)
 
     def _element_label(self, element: Dict[str, Any]) -> str:
         etype = element.get("type", "")
@@ -587,193 +661,180 @@ class TrackCanvas(QWidget):
             return manager.name_of(asset_id)
         return asset_id
 
-    def _paint_playhead(self, painter: QPainter) -> None:
-        x = int(self._view.x_for_time(self._model.playhead))
+    def _paint_playhead(self, painter: QPainter, coord: TimelineCoordinate) -> None:
+        x = int(coord.time_to_x(self._model.playhead))
         painter.setPen(QPen(QColor("#ff5f56"), 1))
         painter.drawLine(x, 0, x, self.height())
 
     # ------------------------------------------------------------ 鼠标
 
+    def _element_at(self, pos: QPoint) -> Optional[Dict[str, Any]]:
+        hit = TimelineInteraction.hit_test(self.coord(), self._model.elements(), pos.x(), pos.y())
+        return hit.element
+
     def mousePressEvent(self, event) -> None:  # noqa: N802
-        element = self._element_at(event.pos())
+        coord = self.coord()
+        elements = self._model.elements()
+        hit = TimelineInteraction.hit_test(coord, elements, event.pos().x(), event.pos().y())
+
         if event.button() == Qt.RightButton:
-            if element:
+            if hit.element:
                 # 右键点在已选中的多个元素之一上时，保持多选，方便批量操作
-                if element["id"] not in self._model.selection():
-                    self._model.select(element["id"])
-                self.elementContextRequested.emit(element["id"], event.globalPos())
+                if hit.element_id not in self._model.selection():
+                    self._model.select(hit.element_id)
+                self.elementContextRequested.emit(hit.element_id, event.globalPos())
             else:
-                track_id = self._track_at_y(event.pos().y())
-                self.emptyContextRequested.emit(
-                    track_id, self._view.time_for_x(event.pos().x()), event.globalPos()
-                )
+                self.emptyContextRequested.emit(hit.track_id or "", hit.time, event.globalPos())
             return
 
         if event.button() != Qt.LeftButton:
             return
 
-        if element is None:
+        if hit.element is None:
             # 空白处按下：先记下起点，移动了就是框选，没移动就是挪播放头
-            self._drag_mode = "rubber"
-            self._drag_origin = event.pos()
+            self._interaction.begin_press(coord, elements, event.pos().x(), event.pos().y())
+            self._rubber_active = True
             self._rubber = QRect(event.pos(), event.pos())
             return
 
         if event.modifiers() & Qt.ControlModifier:
             # Ctrl + 点击：加选 / 取消选中，不进入拖动
-            self._model.toggle_select(element["id"])
+            self._model.toggle_select(hit.element_id)
             return
 
-        if element["id"] in self._model.selection() and len(self._model.selection()) > 1:
-            # 多选状态下点其中一个：保持多选，整组一起拖
-            self.elementClicked.emit(element["id"])
-        else:
-            self.elementClicked.emit(element["id"])
-            self._model.select(element["id"])
+        locked = self._model.is_track_locked(str(hit.element.get("track", "")))
+        # 关键顺序：**先按坐标快照建立手势**，再动选中状态。
+        # 选中会触发 selectionChanged → 主窗口可能横向滚动视图，
+        # 阶段 7 之前先 select 再算 rect，于是"点中间"被算成"点边缘"。
+        self._interaction.begin_press(
+            coord,
+            elements,
+            event.pos().x(),
+            event.pos().y(),
+            selection=self._model.selection(),
+            allow_edit=not locked,
+            markers=self._model.marker_times(),
+        )
+        self._alt_copy = bool(event.modifiers() & Qt.AltModifier) and not locked
 
-        if self._model.is_track_locked(element.get("track", "")):
-            return
-
-        rect = self._element_rect(element)
-        if rect is None:
-            return
-        self._drag_id = element["id"]
-        self._drag_origin = event.pos()
-        self._drag_start_time = float(element.get("start", 0.0))
-        self._drag_start_duration = float(element.get("duration", 0.0))
-        self._drag_track = element.get("track", "")
-        self._drag_copy_done = not bool(event.modifiers() & Qt.AltModifier)
-
-        if abs(event.pos().x() - rect.left()) <= EDGE_GRAB:
-            self._drag_mode = "trim_left"
-        elif abs(event.pos().x() - rect.right()) <= EDGE_GRAB:
-            self._drag_mode = "trim_right"
-        else:
-            self._drag_mode = "move"
+        self.elementClicked.emit(hit.element_id)
+        if not (hit.element_id in self._model.selection() and len(self._model.selection()) > 1):
+            self._model.select(hit.element_id)
+        self._interaction.set_snap_targets(
+            elements,
+            playhead=float(self._model.playhead),
+            exclude_ids=[hit.element_id, *self._interaction.followers()],
+            markers=self._model.marker_times(),
+        )
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802
-        if not self._drag_mode:
-            self._update_cursor(event.pos())
-            return
-
-        if self._drag_mode == "rubber":
-            self._rubber = QRect(self._drag_origin, event.pos()).normalized()
+        if self._rubber_active:
+            self._rubber = QRect(
+                QPoint(*(int(v) for v in self._interaction.rubber_origin())), event.pos()
+            ).normalized()
             self.update()
             return
 
-        delta_seconds = (event.pos().x() - self._drag_origin.x()) / self._view.pixels_per_second
+        if not self._interaction.active:
+            self._update_hover(event.pos())
+            return
 
-        if self._drag_mode == "move":
-            self._handle_move_drag(event, delta_seconds)
-        elif self._drag_mode == "trim_left":
-            new_start = max(0.0, self._drag_start_time + delta_seconds)
-            new_start = self._snap_time(new_start, [self._drag_id])
-            new_duration = self._drag_start_duration - (new_start - self._drag_start_time)
-            if new_duration > 0.02:
-                self._model.resize_element(self._drag_id, new_start, new_duration)
-        else:
-            new_end = self._snap_time(
-                self._drag_start_time + self._drag_start_duration + delta_seconds, [self._drag_id]
-            )
-            new_duration = new_end - self._drag_start_time
-            if new_duration > 0.02:
-                self._model.resize_element(self._drag_id, self._drag_start_time, new_duration)
+        preview = self._interaction.update(
+            event.pos().x(), event.pos().y(), self._model.tracks(), self._model.elements()
+        )
+        if preview is not None:
+            self.dropTrackChanged.emit(preview.track_id)
+            if not preview.valid and preview.reason:
+                self.statusMessage.emit(preview.reason)
         self.update()
 
-    def _handle_move_drag(self, event, delta_seconds: float) -> None:
-        """拖动移动。Alt 按住时先复制一份再拖，多选时整组一起动。"""
-        if not self._drag_copy_done:
-            clone_id = self._model.duplicate_in_place(self._drag_id)
-            self._drag_copy_done = True
-            if clone_id:
-                self._drag_id = clone_id
-                self._model.select(clone_id)
-
-        group = [eid for eid in self._model.selection() if eid != self._drag_id]
-        new_start = max(0.0, self._drag_start_time + delta_seconds)
-        new_start = self._snap_move(new_start, self._drag_start_duration, self._model.selection())
-
-        target_track = self._track_at_y(event.pos().y()) or self._drag_track
-        element = self._model.element(self._drag_id)
-        if element is not None:
-            # 只允许放到 kind 匹配的轨道，避免把音频丢到视频轨
-            expected = tl.TYPE_TRACK_KIND.get(element.get("type", ""))
-            track = self._model.track(target_track)
-            if expected and track and track.get("kind") != expected:
-                target_track = self._drag_track
-            if self._model.is_track_locked(target_track):
-                target_track = self._drag_track
-
-        if group:
-            # 多选拖动：只沿时间轴整体平移，不跨轨道，避免轨道错位
-            offset = new_start - float(
-                (self._model.element(self._drag_id) or {}).get("start", new_start)
-            )
-            self._model.move_element(self._drag_id, new_start, None)
-            for other_id in group:
-                other = self._model.element(other_id)
-                if other is None or self._model.is_track_locked(other.get("track", "")):
-                    continue
-                self._model.move_element(
-                    other_id, max(0.0, float(other.get("start", 0.0)) + offset), None
-                )
-            return
-        self._model.move_element(self._drag_id, new_start, target_track)
-
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
-        if self._drag_mode == "rubber":
+        if self._rubber_active:
             moved = self._rubber.width() > 3 or self._rubber.height() > 3
             if moved:
                 self._select_in_rect(self._rubber)
             else:
-                self.playheadRequested.emit(self._view.time_for_x(event.pos().x()))
+                coord = self.coord()
+                self.playheadRequested.emit(
+                    coord.snap_time(coord.clamp_time(coord.x_to_time(event.pos().x())))
+                )
                 self._model.select("")
             self._rubber = QRect()
-        self._drag_mode = ""
-        self._drag_id = ""
-        self._snap_line = None
+            self._rubber_active = False
+            self._interaction.reset()
+            self.update()
+            return
+
+        self._commit_gesture()
+        self._interaction.reset()
+        self.dropTrackChanged.emit("")
         self.update()
+
+    def _commit_gesture(self) -> None:
+        """一次手势 → 一次落库。GUI 只调 TimelineModel 的公开方法。"""
+        commit = self._interaction.commit()
+        if commit is None:
+            return
+        if isinstance(commit, MoveCommit):
+            element_id = commit.element_id
+            if self._alt_copy:
+                clone_id = self._model.duplicate_in_place(element_id)
+                if clone_id:
+                    element_id = clone_id
+                    self._model.select(clone_id)
+            self._model.move_element(element_id, commit.start, commit.track_id)
+            for follower_id, start in commit.followers:
+                if self._model.is_track_locked(
+                    str((self._model.element(follower_id) or {}).get("track", ""))
+                ):
+                    continue
+                self._model.move_element(follower_id, start, None)
+        elif isinstance(commit, ResizeCommit):
+            self._model.resize_element(commit.element_id, commit.start, commit.duration)
+        self._alt_copy = False
 
     def _select_in_rect(self, rect: QRect) -> None:
         """框选：和矩形有交集的元素全部选中。"""
+        coord = self.coord()
+        box = Rect(rect.x(), rect.y(), rect.width(), rect.height())
         hits: List[str] = []
         for element in self._model.elements():
-            element_rect = self._element_rect(element)
-            if element_rect is None:
-                continue
-            if rect.intersects(element_rect.toRect()):
-                hits.append(element.get("id", ""))
+            element_rect = coord.element_to_hit_rect(element)
+            if element_rect is not None and element_rect.intersects(box):
+                hits.append(str(element.get("id", "")))
         self._model.select_many(hits)
-
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
         element = self._element_at(event.pos())
         if element:
-            self.elementDoubleClicked.emit(element["id"])
+            self.elementDoubleClicked.emit(str(element.get("id", "")))
 
-    def _update_cursor(self, pos: QPoint) -> None:
-        element = self._element_at(pos)
-        if element is None:
+    def _update_hover(self, pos: QPoint) -> None:
+        coord = self.coord()
+        hit = TimelineInteraction.hit_test(coord, self._model.elements(), pos.x(), pos.y())
+        hover_id = hit.element_id
+        if hover_id != self._hover_id:
+            self._hover_id = hover_id
+            self.update()
+        if hit.element is None:
             self.setCursor(Qt.ArrowCursor)
             return
-        rect = self._element_rect(element)
-        if rect is None:
-            return
-        if abs(pos.x() - rect.left()) <= EDGE_GRAB or abs(pos.x() - rect.right()) <= EDGE_GRAB:
-            self.setCursor(Qt.SizeHorCursor)
-        else:
-            self.setCursor(Qt.OpenHandCursor)
+        self.setCursor(Qt.SizeHorCursor if hit.zone in ("left", "right") else Qt.OpenHandCursor)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        if self._hover_id:
+            self._hover_id = ""
+            self.update()
 
     def wheelEvent(self, event) -> None:  # noqa: N802
         if event.modifiers() & Qt.ControlModifier:
             # 以鼠标位置为锚点缩放，手感和专业剪辑软件一致
-            anchor_time = self._view.time_for_x(event.pos().x())
+            coord = self.coord()
+            anchor_time = coord.x_to_time(event.pos().x())
             factor = 1.25 if event.angleDelta().y() > 0 else 0.8
-            self._view.pixels_per_second = max(
-                MIN_PPS, min(MAX_PPS, self._view.pixels_per_second * factor)
-            )
-            self._view.scroll_x = max(
-                0.0, anchor_time * self._view.pixels_per_second - event.pos().x()
+            new_pps = self._view.zoom.set_zoom(coord.pixels_per_second * factor)
+            self._view.scroll_x = coord.with_zoom(new_pps).scroll_for_anchor(
+                anchor_time, event.pos().x()
             )
             self.zoomChanged.emit()
             event.accept()
@@ -789,30 +850,98 @@ class TrackCanvas(QWidget):
             return []
         return [url.toLocalFile() for url in mime.urls() if url.isLocalFile()]
 
+    def _begin_external_drag(self, mime) -> bool:
+        """把一次外部拖入变成 DRAG_ASSET 手势，这样 ghost / 磁吸 / 轨道校验全都走同一条路。"""
+        payload = read_drag_payload(mime)
+        files = self._local_files(mime)
+        if payload is None and not files:
+            return False
+        if payload is None:
+            payload = {"kind": "files", "files": files}
+            element_type = "video"
+            duration = UNKNOWN_DROP_SECONDS
+            label = os.path.basename(files[0]) + (f" 等 {len(files)} 个" if len(files) > 1 else "")
+        else:
+            element_type, duration, label = self._resolve_drop_info(payload)
+        self._interaction.begin_asset_drag(
+            self.coord(),
+            self._model.elements(),
+            payload,
+            duration,
+            element_type,
+            label,
+            playhead=float(self._model.playhead),
+            markers=self._model.marker_times(),
+        )
+        return True
+
+    def _resolve_drop_info(self, payload: Dict[str, Any]) -> Tuple[str, float, str]:
+        if self._drop_info is not None:
+            try:
+                return self._drop_info(payload)
+            except Exception:  # pragma: no cover - 提供方异常不能让拖放崩掉
+                pass
+        kind = str(payload.get("kind", ""))
+        default_type = {
+            "effect": "effect",
+            "effect_material": "overlay",
+            "transition": "transition",
+            "caption": "caption",
+        }.get(kind, "video")
+        return (default_type, UNKNOWN_DROP_SECONDS, str(payload.get("id", kind)))
+
     def dragEnterEvent(self, event) -> None:  # noqa: N802
-        if read_drag_payload(event.mimeData()) is not None or self._local_files(event.mimeData()):
+        if self._begin_external_drag(event.mimeData()):
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event) -> None:  # noqa: N802
-        if read_drag_payload(event.mimeData()) is not None or self._local_files(event.mimeData()):
-            event.acceptProposedAction()
+        if self._interaction.mode != InteractionMode.DRAG_ASSET and not self._begin_external_drag(
+            event.mimeData()
+        ):
+            return
+        preview = self._interaction.update(
+            event.pos().x(), event.pos().y(), self._model.tracks(), self._model.elements()
+        )
+        if preview is not None:
+            self.dropTrackChanged.emit(preview.track_id)
+            if preview.valid:
+                event.acceptProposedAction()
+                if preview.note:
+                    # 落位策略换了轨道：ghost 已经跳过去了，状态栏说明为什么
+                    self.statusMessage.emit(preview.note)
+            else:
+                # 明确拒绝而不是静默失败（第二十六条）
+                event.ignore()
+                self.statusMessage.emit(preview.reason)
+        self.update()
+
+
+    def dragLeaveEvent(self, event) -> None:  # noqa: N802
+        self._interaction.reset()
+        self.dropTrackChanged.emit("")
+        self.update()
 
     def dropEvent(self, event) -> None:  # noqa: N802
-        track_id = self._track_at_y(event.pos().y())
-        drop_time = self._view.time_for_x(event.pos().x())
+        preview = self._interaction.update(
+            event.pos().x(), event.pos().y(), self._model.tracks(), self._model.elements()
+        )
+        commit = self._interaction.commit() if preview is not None else None
+        self._interaction.reset()
+        self.dropTrackChanged.emit("")
+        self.update()
 
-        files = self._local_files(event.mimeData())
+        if preview is not None and not preview.valid:
+            self.statusMessage.emit(preview.reason)
+            return
+        if not isinstance(commit, DropCommit):
+            return
+
+        files = commit.payload.get("files")
         if files:
-            self.filesDropped.emit(files, track_id, drop_time)
-            event.acceptProposedAction()
-            return
-
-        payload = read_drag_payload(event.mimeData())
-        if payload is None:
-            return
-        self.itemDropped.emit(payload, track_id, drop_time)
+            self.filesDropped.emit(list(files), commit.track_id, commit.start)
+        else:
+            self.itemDropped.emit(commit.payload, commit.track_id, commit.start)
         event.acceptProposedAction()
-
 
 
 class TimelineWidget(QAbstractScrollArea):
@@ -824,17 +953,17 @@ class TimelineWidget(QAbstractScrollArea):
     trackContextRequested = pyqtSignal(str, QPoint)
     itemDropped = pyqtSignal(dict, str, float)
     filesDropped = pyqtSignal(list, str, float)
+    statusMessage = pyqtSignal(str)
     # 工具条按钮：由主窗口接到具体动作上，和快捷键走同一套实现
     splitRequested = pyqtSignal()
     deleteRequested = pyqtSignal()
     freezeRequested = pyqtSignal()
     duplicateRequested = pyqtSignal()
 
-
     def __init__(self, model, parent=None) -> None:
         super().__init__(parent)
         self._model = model
-        self._view = ViewState()
+        self._view = ViewState(model)
 
         container = QWidget()
         layout = QGridLayout(container)
@@ -872,6 +1001,8 @@ class TimelineWidget(QAbstractScrollArea):
         self.canvas.itemDropped.connect(self.itemDropped)
         self.canvas.filesDropped.connect(self.filesDropped)
         self.canvas.zoomChanged.connect(self._on_zoom_changed)
+        self.canvas.dropTrackChanged.connect(self.header.set_drop_track)
+        self.canvas.statusMessage.connect(self.statusMessage)
         self.header.trackFlagToggled.connect(model.toggle_track_flag)
         self.header.trackMoveRequested.connect(model.move_track)
         self.header.trackContextRequested.connect(self.trackContextRequested)
@@ -917,7 +1048,7 @@ class TimelineWidget(QAbstractScrollArea):
         self._snap_button.setChecked(True)
         self._snap_button.setFocusPolicy(Qt.NoFocus)
         self._snap_button.setToolTip(
-            f"拖动时吸附到播放头和相邻片段边缘（{shortcuts.primary('toggle_snap')}）"
+            f"拖动时吸附到刻度、播放头、相邻片段的首尾与中心（{shortcuts.primary('toggle_snap')}）"
         )
         self._snap_button.toggled.connect(self.canvas.set_snap_enabled)
         row.addWidget(self._snap_button)
@@ -937,47 +1068,126 @@ class TimelineWidget(QAbstractScrollArea):
         row.addWidget(self._time_label)
 
         row.addSpacing(8)
-        add_button("－", f"缩小（{shortcuts.primary('zoom_out')}）", lambda: self.zoom(0.8))
+        self._zoom_label = QLabel("100% · 80 px/s")
+        self._zoom_label.setStyleSheet("color:#6f7b8c; font-family: Consolas;")
+        row.addWidget(self._zoom_label)
+        add_button("－", f"缩小一档（{shortcuts.primary('zoom_out')}）", self.zoom_out)
+        self._zoom_combo = QComboBox()
+        self._zoom_combo.setFixedWidth(78)
+        self._zoom_combo.setFocusPolicy(Qt.NoFocus)
+        self._zoom_combo.setToolTip("缩放档位（100% = 80 px/s）")
+        for percent in PERCENT_STEPS:
+            self._zoom_combo.addItem(TimelineZoom.percent_label(percent), percent)
+        self._zoom_combo.setCurrentIndex(self._view.zoom.step_index())
+        self._zoom_combo.activated.connect(self._on_zoom_combo)
+        row.addWidget(self._zoom_combo)
         self._zoom_slider = QSlider(Qt.Horizontal)
         self._zoom_slider.setFixedWidth(120)
         self._zoom_slider.setRange(0, 100)
-        self._zoom_slider.setValue(self._zoom_to_slider(self._view.pixels_per_second))
+        self._zoom_slider.setValue(int(self._view.zoom.slider_ratio() * 100))
         self._zoom_slider.setFocusPolicy(Qt.NoFocus)
-        self._zoom_slider.setToolTip("时间线缩放")
+        self._zoom_slider.setToolTip("时间线缩放（自由拖动，档位见左侧下拉）")
         self._zoom_slider.valueChanged.connect(self._on_zoom_slider)
         row.addWidget(self._zoom_slider)
-        add_button("＋", f"放大（{shortcuts.primary('zoom_in')}）", lambda: self.zoom(1.25))
+
+        add_button("＋", f"放大一档（{shortcuts.primary('zoom_in')}）", self.zoom_in)
         add_button("⤢ 适配", f"缩放到整条时间线（{shortcuts.primary('zoom_fit')}）", self.zoom_to_fit)
         return bar
 
-    @staticmethod
-    def _zoom_to_slider(pps: float) -> int:
-        """像素/秒 映射到滑块位置，用对数刻度，手感更均匀。"""
-        ratio = (math.log(max(MIN_PPS, pps)) - math.log(MIN_PPS)) / (
-            math.log(MAX_PPS) - math.log(MIN_PPS)
-        )
-        return int(max(0.0, min(1.0, ratio)) * 100)
-
-    @staticmethod
-    def _slider_to_zoom(value: int) -> float:
-        ratio = max(0, min(100, value)) / 100.0
-        return math.exp(math.log(MIN_PPS) + ratio * (math.log(MAX_PPS) - math.log(MIN_PPS)))
+    # ------------------------------------------------------------ 缩放
 
     def _on_zoom_slider(self, value: int) -> None:
-        self._view.pixels_per_second = self._slider_to_zoom(value)
+        self._view.zoom.set_zoom(TimelineZoom.ratio_to_zoom(value / 100.0))
         self._sync_scrollbars()
+        self._update_zoom_label()
         self._repaint_all()
+
+    def _on_zoom_combo(self, index: int) -> None:
+        """下拉选档：以视口中心的时间为锚点，缩放前后中心不跑。"""
+        percent = self._zoom_combo.itemData(index)
+        if percent is None:
+            return
+        coord = self.coord()
+        center_x = max(1.0, self.canvas.width() / 2.0)
+        anchor_time = coord.x_to_time(center_x)
+        new_pps = self._view.zoom.set_percent(float(percent))
+        self._view.scroll_x = coord.with_zoom(new_pps).scroll_for_anchor(anchor_time, center_x)
+        self._sync_zoom_slider()
+        self.refresh()
+
 
     def _on_zoom_changed(self) -> None:
         """Ctrl+滚轮缩放后，把滑块同步过来。"""
         self._sync_zoom_slider()
         self._sync_scrollbars()
 
+    def zoom(self, factor: float) -> None:
+        """按倍数缩放（保留旧接口，菜单与快捷键在用）。"""
+        self._view.zoom.set_zoom(self._view.zoom.pixels_per_second * float(factor))
+        self._sync_zoom_slider()
+        self.refresh()
+
+    def zoom_in(self) -> None:
+        self._view.zoom.zoom_in()
+        self._sync_zoom_slider()
+        self.refresh()
+
+    def zoom_out(self) -> None:
+        self._view.zoom.zoom_out()
+        self._sync_zoom_slider()
+        self.refresh()
+
+    def zoom_to_fit(self) -> None:
+        self._view.zoom.fit_project(max(self._model.duration, 1.0), max(120, self.canvas.width() - 20))
+        self._view.scroll_x = 0.0
+        self._sync_zoom_slider()
+        self.refresh()
+
+    def zoom_to_selection(self) -> None:
+        element = self._model.element(self._model.selected_id)
+        if element is None:
+            self.zoom_to_fit()
+            return
+        start = float(element.get("start", 0.0) or 0.0)
+        end = start + float(element.get("duration", 0.0) or 0.0)
+        self._view.zoom.fit_selection(start, end, max(120, self.canvas.width() - 20))
+        self._view.scroll_x = self._view.coord().scroll_for_anchor(start, 20.0)
+        self._sync_zoom_slider()
+        self.refresh()
+
+    def pixels_per_second(self) -> float:
+        return self._view.zoom.pixels_per_second
+
+    def coordinate(self) -> TimelineCoordinate:
+        """给测试与外部工具用的坐标快照。"""
+        return self._view.coord()
+
+    def _sync_zoom_slider(self) -> None:
+        self._zoom_slider.blockSignals(True)
+        self._zoom_slider.setValue(int(self._view.zoom.slider_ratio() * 100))
+        self._zoom_slider.blockSignals(False)
+        self._zoom_combo.blockSignals(True)
+        self._zoom_combo.setCurrentIndex(self._view.zoom.step_index())
+        self._zoom_combo.blockSignals(False)
+        self._update_zoom_label()
+
+    def _update_zoom_label(self) -> None:
+        zoom = self._view.zoom
+        self._zoom_label.setText(
+            f"{zoom.percent():g}% · {zoom.pixels_per_second:.0f} px/s"
+        )
+
+
+    # ------------------------------------------------------------ 磁吸 / 选中
+
     def toggle_snap(self) -> None:
         self._snap_button.setChecked(not self._snap_button.isChecked())
 
     def snap_enabled(self) -> bool:
         return self._snap_button.isChecked()
+
+    def set_drop_info_provider(self, provider) -> None:
+        self.canvas.set_drop_info_provider(provider)
 
     def _on_element_clicked(self, element_id: str) -> None:
         """画布点击已经处理过选中逻辑（含 Ctrl 加选），这里只做转发。"""
@@ -996,13 +1206,15 @@ class TimelineWidget(QAbstractScrollArea):
 
     def _ensure_playhead_visible(self, seconds: float) -> None:
         """播放头快出画面时把视图推过去，播放时看起来就像剪映那样自动跑。"""
-        width = max(1, self.canvas.width())
-        x = self._view.x_for_time(seconds)
-        left_margin = width * 0.1
-        right_margin = width * 0.85
-        if left_margin <= x <= right_margin:
+        if self.canvas.gesture_active():
             return
-        target = max(0.0, seconds * self._view.pixels_per_second - left_margin)
+        coord = self._view.coord()
+        width = max(1, self.canvas.width())
+        x = coord.time_to_x(seconds)
+        left_margin = width * 0.1
+        if left_margin <= x <= width * 0.85:
+            return
+        target = coord.scroll_for_anchor(seconds, left_margin)
         bar = self.horizontalScrollBar()
         if int(target) != bar.value():
             bar.setValue(int(target))
@@ -1012,40 +1224,32 @@ class TimelineWidget(QAbstractScrollArea):
             f"{format_timecode(self._model.playhead)} / {format_timecode(self._model.duration)}"
         )
 
-
     # ------------------------------------------------------------ 刷新
 
     def refresh(self) -> None:
         self._sync_scrollbars()
         self._update_time_label()
+        self._update_zoom_label()
         self._repaint_all()
 
     def set_issues(self, issues: Dict[str, str]) -> None:
         self.canvas.set_issues(issues)
 
-    def zoom(self, factor: float) -> None:
-        self._view.pixels_per_second = max(
-            MIN_PPS, min(MAX_PPS, self._view.pixels_per_second * factor)
-        )
-        self._sync_zoom_slider()
-        self.refresh()
-
-    def zoom_to_fit(self) -> None:
-        duration = max(self._model.duration, 1.0)
-        available = max(120, self.canvas.width() - 20)
-        self._view.pixels_per_second = max(MIN_PPS, min(MAX_PPS, available / duration))
-        self._view.scroll_x = 0.0
-        self._sync_zoom_slider()
-        self.refresh()
-
-    def _sync_zoom_slider(self) -> None:
-        self._zoom_slider.blockSignals(True)
-        self._zoom_slider.setValue(self._zoom_to_slider(self._view.pixels_per_second))
-        self._zoom_slider.blockSignals(False)
-
     def scroll_to_time(self, seconds: float) -> None:
-        """把某个时间点滚到可见区域中间，JSON 面板反选元素时用。"""
-        target = max(0.0, seconds * self._view.pixels_per_second - self.canvas.width() / 2)
+        """把某个时间点滚到可见区域，JSON 面板反选元素时用。
+
+        只在目标**不可见**时才滚，而且手势期间绝不滚：
+        阶段 7 之前这里无条件把选中元素居中，于是在 mousePressEvent 里
+        选中 → 视图横移 → 后续边缘判定全错（审计第 17 问）。
+        """
+        if self.canvas.gesture_active():
+            return
+        coord = self._view.coord()
+        x = coord.time_to_x(seconds)
+        width = max(1, self.canvas.width())
+        if 0.0 <= x <= width - 1:
+            return
+        target = coord.scroll_for_anchor(seconds, width * 0.25)
         self.horizontalScrollBar().setValue(int(target))
 
     def _repaint_all(self) -> None:
@@ -1054,17 +1258,18 @@ class TimelineWidget(QAbstractScrollArea):
         self.canvas.update()
 
     def _sync_scrollbars(self) -> None:
+        coord = self._view.coord()
         h_bar = self.horizontalScrollBar()
         page = max(1, self.canvas.width())
         h_bar.setPageStep(page)
         h_bar.setSingleStep(40)
-        h_bar.setRange(0, max(0, int(self.canvas.content_width() - page)))
+        h_bar.setRange(0, max(0, int(coord.content_width(self._model.duration) - page)))
 
         v_bar = self.verticalScrollBar()
         v_page = max(1, self.canvas.height())
         v_bar.setPageStep(v_page)
-        v_bar.setSingleStep(ROW_HEIGHT)
-        v_bar.setRange(0, max(0, self.canvas.content_height() - v_page))
+        v_bar.setSingleStep(int(ROW_HEIGHT))
+        v_bar.setRange(0, max(0, int(coord.content_height()) - v_page))
 
     def _on_h_scroll(self, value: int) -> None:
         self._view.scroll_x = float(value)

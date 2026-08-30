@@ -12,7 +12,7 @@ import os
 import subprocess
 from typing import Any, Dict, List, Optional
 
-from PyQt5.QtCore import QSize, Qt, pyqtSignal
+from PyQt5.QtCore import QPoint, QSize, Qt, pyqtSignal
 from PyQt5.QtGui import QDrag, QIcon, QPixmap
 from PyQt5.QtWidgets import (
     QAbstractItemView,
@@ -67,7 +67,12 @@ class AssetListWidget(QListWidget):
         drag.setMimeData(make_drag_payload("asset", asset["id"], {"asset_type": asset.get("type")}))
         icon = item.icon()
         if not icon.isNull():
-            drag.setPixmap(icon.pixmap(THUMB_SIZE))
+            pixmap = icon.pixmap(THUMB_SIZE)
+            drag.setPixmap(pixmap)
+            # 热点放在缩略图左下角：默认 (0,0) 会让 104×68 的图从光标向右下铺开，
+            # 正好盖住时间线上的落点和刻度，用户只能靠猜。挪到左下角后光标下方是干净的，
+            # ghost clip 与磁吸引导线才看得见。
+            drag.setHotSpot(QPoint(0, pixmap.height()))
         drag.exec_(Qt.CopyAction)
 
     # ------------------------------------------------------------ 外部文件拖入
