@@ -1,0 +1,223 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "timeline_schema.json",
+  "title": "AI Video Timeline Schema",
+  "description": "GUI 人工编辑与未来 AI 生成共用的唯一 Timeline 协议。所有时间字段单位为秒。",
+  "type": "object",
+  "required": ["version", "time_unit", "meta", "tracks", "elements"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "time_unit": { "const": "seconds" },
+    "meta": {
+      "type": "object",
+      "required": ["name", "fps", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "fps": { "type": "number", "minimum": 1, "maximum": 120 },
+        "width": { "type": "integer", "minimum": 16 },
+        "height": { "type": "integer", "minimum": 16 },
+        "duration": { "type": "number", "minimum": 0 },
+        "background": { "type": "string" }
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/track" }
+    },
+    "elements": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/element" }
+    }
+  },
+  "definitions": {
+    "track": {
+      "type": "object",
+      "required": ["id", "name", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "name": { "type": "string" },
+        "kind": { "enum": ["video", "text", "audio"] },
+        "locked": { "type": "boolean" },
+        "hidden": { "type": "boolean" }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "description": "0=左 1=右，画面归一化坐标" },
+        "y": { "type": "number", "description": "0=上 1=下，画面归一化坐标" },
+        "scale": { "type": "number", "exclusiveMinimum": 0 },
+        "rotation": { "type": "number", "description": "角度" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "type": "number", "minimum": 0 },
+        "end": { "type": "number", "minimum": 0 }
+      }
+    },
+    "keyframe": {
+      "type": "object",
+      "required": ["time", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "time": { "type": "number", "minimum": 0, "description": "相对元素自身起点的秒数" },
+        "value": { "type": "number" },
+        "easing": { "enum": ["linear", "easeIn", "easeOut", "easeInOut"] }
+      }
+    },
+    "keyframes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scale": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } },
+        "x": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } },
+        "y": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } },
+        "rotation": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } },
+        "opacity": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } },
+        "blur": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } },
+        "brightness": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } },
+        "contrast": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } },
+        "saturation": { "type": "array", "items": { "$ref": "#/definitions/keyframe" } }
+      }
+    },
+    "textStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fontFamily": { "type": "string" },
+        "fontSize": { "type": "number", "exclusiveMinimum": 0 },
+        "fontWeight": { "type": "integer", "minimum": 100, "maximum": 900 },
+        "color": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "align": { "enum": ["left", "center", "right"] },
+        "lineHeight": { "type": "number" },
+        "letterSpacing": { "type": "number" },
+        "stroke": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "width": { "type": "number", "minimum": 0 },
+            "color": { "type": "string" }
+          }
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "blur": { "type": "number", "minimum": 0 },
+            "color": { "type": "string" }
+          }
+        }
+      }
+    },
+    "word": {
+      "type": "object",
+      "required": ["text", "start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string" },
+        "start": { "type": "number", "minimum": 0, "description": "绝对时间线秒数" },
+        "end": { "type": "number", "minimum": 0 }
+      }
+    },
+    "element": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "enum": [
+            "video",
+            "overlay",
+            "text",
+            "caption",
+            "caption_group",
+            "audio",
+            "effect",
+            "transition",
+            "freeze"
+          ]
+        },
+        "track": { "type": "string" },
+        "label": { "type": "string" },
+        "start": { "type": "number", "minimum": 0 },
+        "duration": { "type": "number", "exclusiveMinimum": 0 },
+        "asset": { "type": "string" },
+        "source": { "$ref": "#/definitions/source" },
+        "speed": { "type": "number", "exclusiveMinimum": 0 },
+        "transform": { "$ref": "#/definitions/transform" },
+        "keyframes": { "$ref": "#/definitions/keyframes" },
+        "animation": { "type": "string" },
+        "z_index": { "type": "integer" },
+        "audio": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "volume": { "type": "number", "minimum": 0, "maximum": 4 }
+          }
+        },
+        "volume": { "type": "number", "minimum": 0, "maximum": 4 },
+        "fade": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "in": { "type": "number", "minimum": 0 },
+            "out": { "type": "number", "minimum": 0 }
+          }
+        },
+        "content": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": { "type": "string" },
+            "words": { "type": "array", "items": { "$ref": "#/definitions/word" } }
+          }
+        },
+        "style": { "$ref": "#/definitions/textStyle" },
+        "caption_style": {
+          "enum": [
+            "plain",
+            "word_by_word",
+            "highlight_current",
+            "karaoke",
+            "char_by_char",
+            "bounce",
+            "pop",
+            "two_line"
+          ]
+        },
+        "template": { "type": "string" },
+        "highlight": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "color": { "type": "string" },
+            "backgroundColor": { "type": "string" },
+            "scale": { "type": "number" }
+          }
+        },
+        "name": { "type": "string", "description": "effect / transition 的库内名称" },
+        "target": { "type": "string", "description": "effect / freeze 作用的元素 id" },
+        "params": { "type": "object" },
+        "easing": { "enum": ["linear", "easeIn", "easeOut", "easeInOut"] },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "source_time": { "type": "number", "minimum": 0 },
+        "note": { "type": "string", "description": "人工实验备注，不影响渲染" }
+      }
+    }
+  }
+}

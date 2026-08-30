@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "caption_schema.json",
+  "title": "Caption Template Schema",
+  "description": "Caption Library 模板定义。Caption 与 Text 是两个独立概念，不共用模板。",
+  "type": "object",
+  "required": ["version", "templates"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "templates": { "type": "array", "items": { "$ref": "#/definitions/template" } }
+  },
+  "definitions": {
+    "template": {
+      "type": "object",
+      "required": ["name", "label", "caption_style", "style"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "label": { "type": "string" },
+        "caption_style": {
+          "enum": [
+            "plain",
+            "word_by_word",
+            "highlight_current",
+            "karaoke",
+            "char_by_char",
+            "bounce",
+            "pop",
+            "two_line"
+          ]
+        },
+        "description": { "type": "string" },
+        "style": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "fontFamily": { "type": "string" },
+            "fontSize": { "type": "number" },
+            "fontWeight": { "type": "integer" },
+            "color": { "type": "string" },
+            "backgroundColor": { "type": "string" },
+            "align": { "enum": ["left", "center", "right"] },
+            "lineHeight": { "type": "number" },
+            "letterSpacing": { "type": "number" },
+            "stroke": { "type": "object" },
+            "shadow": { "type": "object" }
+          }
+        },
+        "highlight": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "color": { "type": "string" },
+            "backgroundColor": { "type": "string" },
+            "scale": { "type": "number" }
+          }
+        },
+        "transform": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "scale": { "type": "number" },
+            "rotation": { "type": "number" },
+            "opacity": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}

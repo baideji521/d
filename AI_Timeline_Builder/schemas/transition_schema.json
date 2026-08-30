@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "transition_schema.json",
+  "title": "Transition Definition Schema",
+  "description": "Transition Library 定义。转场必须绑定 from / to 两个 Video Clip。",
+  "type": "object",
+  "required": ["version", "transitions"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "transitions": { "type": "array", "items": { "$ref": "#/definitions/transition" } }
+  },
+  "definitions": {
+    "param": {
+      "type": "object",
+      "required": ["key", "label", "type", "default"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "enum": ["number", "int", "bool", "enum", "color"] },
+        "default": {},
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "hint": { "type": "string" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "required": ["name", "label", "default_duration", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "label": { "type": "string" },
+        "category": { "type": "string" },
+        "default_duration": { "type": "number", "exclusiveMinimum": 0 },
+        "description": { "type": "string" },
+        "params": { "type": "array", "items": { "$ref": "#/definitions/param" } }
+      }
+    }
+  }
+}

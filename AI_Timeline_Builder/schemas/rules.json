@@ -1,0 +1,148 @@
+{
+  "time_unit": "seconds",
+  "description": "Timeline 规则引擎配置。所有规则由 core/timeline_validator.py 实现，id 与此文件一一对应。",
+  "rules": [
+    {
+      "id": "RULE_TIME_001",
+      "level": "error",
+      "description": "所有时间必须使用秒，禁止出现 frame 字段"
+    },
+    {
+      "id": "RULE_TIME_002",
+      "level": "error",
+      "description": "start 不得小于 0"
+    },
+    {
+      "id": "RULE_VIDEO_001",
+      "level": "error",
+      "description": "source.end 不得超过源视频长度"
+    },
+    {
+      "id": "RULE_VIDEO_002",
+      "level": "error",
+      "description": "duration 必须大于 0"
+    },
+    {
+      "id": "RULE_VIDEO_003",
+      "level": "error",
+      "description": "source.start 必须小于 source.end"
+    },
+    {
+      "id": "RULE_VIDEO_004",
+      "level": "warning",
+      "description": "duration 应与 (source.end - source.start) / speed 一致"
+    },
+    {
+      "id": "RULE_TRANSITION_001",
+      "level": "error",
+      "description": "Transition 必须连接两个已存在的 Video Clip"
+    },
+    {
+      "id": "RULE_TRANSITION_002",
+      "level": "error",
+      "description": "Transition 的 from 与 to 不得为同一个 Clip"
+    },
+    {
+      "id": "RULE_TRANSITION_003",
+      "level": "warning",
+      "description": "Transition 时长不得超过任一相邻 Clip 时长的一半"
+    },
+    {
+      "id": "RULE_ASSET_001",
+      "level": "error",
+      "description": "所有 asset 必须存在于 Asset Library"
+    },
+    {
+      "id": "RULE_ASSET_002",
+      "level": "error",
+      "description": "asset 引用的文件必须在磁盘上真实存在"
+    },
+    {
+      "id": "RULE_TRACK_001",
+      "level": "error",
+      "description": "元素引用的 track 必须存在于 tracks 定义中"
+    },
+    {
+      "id": "RULE_TRACK_002",
+      "level": "warning",
+      "description": "元素类型应与轨道类型匹配（视频元素放视频轨、音频元素放音频轨）"
+    },
+    {
+      "id": "RULE_CAPTION_001",
+      "level": "error",
+      "description": "Caption 必须存在 text 或 words"
+    },
+    {
+      "id": "RULE_CAPTION_002",
+      "level": "error",
+      "description": "caption_group 的 words 时间必须递增且不重叠"
+    },
+    {
+      "id": "RULE_TEXT_001",
+      "level": "error",
+      "description": "Text 元素必须有非空 content.text"
+    },
+    {
+      "id": "RULE_EFFECT_001",
+      "level": "error",
+      "description": "Effect 的 name 必须存在于 Effect Library"
+    },
+    {
+      "id": "RULE_EFFECT_002",
+      "level": "warning",
+      "description": "Effect 的 target 若指定，必须指向已存在的元素"
+    },
+    {
+      "id": "RULE_FREEZE_001",
+      "level": "error",
+      "description": "Freeze 的 target 必须指向已存在的 Video Clip"
+    },
+    {
+      "id": "RULE_FREEZE_002",
+      "level": "error",
+      "description": "Freeze 的 source_time 必须落在目标 Clip 的源素材区间内"
+    },
+    {
+      "id": "RULE_KEYFRAME_001",
+      "level": "error",
+      "description": "Keyframe 时间必须递增，且不得超出元素 duration"
+    },
+    {
+      "id": "RULE_KEYFRAME_002",
+      "level": "error",
+      "description": "Keyframe 参数名必须在允许列表内"
+    },
+    {
+      "id": "RULE_ID_001",
+      "level": "error",
+      "description": "元素 id 必须全局唯一"
+    },
+    {
+      "id": "RULE_TRANSFORM_001",
+      "level": "error",
+      "description": "opacity 必须在 0 到 1 之间，scale 必须大于 0"
+    },
+    {
+      "id": "RULE_AUDIO_001",
+      "level": "error",
+      "description": "volume 必须在 0 到 4 之间，fade 不得为负"
+    },
+    {
+      "id": "RULE_AUDIO_002",
+      "level": "warning",
+      "description": "fade.in + fade.out 不应超过 duration"
+    }
+  ],
+  "keyframe_params": [
+    "scale",
+    "x",
+    "y",
+    "rotation",
+    "opacity",
+    "blur",
+    "brightness",
+    "contrast",
+    "saturation"
+  ],
+  "easings": ["linear", "easeIn", "easeOut", "easeInOut"]
+}

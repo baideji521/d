@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "asset_schema.json",
+  "title": "Asset Manifest Schema",
+  "description": "asset_manifest.json 的结构。Timeline JSON 只引用 asset id，路径映射由本清单负责。",
+  "type": "object",
+  "required": ["version", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "scanned_at": { "type": "string" },
+    "assets": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/asset" }
+    }
+  },
+  "definitions": {
+    "asset": {
+      "type": "object",
+      "required": ["id", "name", "type", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "如 video_001 / overlay_arrow_001 / sfx_impact_001" },
+        "name": { "type": "string" },
+        "type": {
+          "enum": ["video", "image", "audio", "overlay", "effect", "font", "template"]
+        },
+        "category": { "type": "string", "description": "来自子目录名，如 arrow / impact / fire" },
+        "path": { "type": "string", "description": "相对项目根目录的正斜杠路径" },
+        "duration": { "type": "number", "minimum": 0 },
+        "width": { "type": "integer", "minimum": 0 },
+        "height": { "type": "integer", "minimum": 0 },
+        "fps": { "type": "number", "minimum": 0 },
+        "has_audio": { "type": "boolean" },
+        "has_alpha": { "type": "boolean" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "thumbnail": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

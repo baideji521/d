@@ -1,0 +1,24 @@
+{
+  "name": "ai-timeline-renderer",
+  "version": "1.0.0",
+  "description": "按 Timeline JSON 渲染视频的 Remotion 工程。由 AI_Timeline_Builder 导出驱动。",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "node render.mjs",
+    "build": "remotion bundle"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.518",
+    "@remotion/cli": "4.0.518",
+    "@remotion/renderer": "4.0.518",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.518"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "typescript": "5.9.3"
+  }
+}

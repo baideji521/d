@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "overlay_arrow_001",
+      "name": "arrow_red",
+      "type": "overlay",
+      "path": "assets/overlays/arrow/arrow_red.png",
+      "duration": 0,
+      "width": 512,
+      "height": 512,
+      "fps": 25.0
+    },
+    {
+      "id": "sfx_bgm_001",
+      "name": "bgm_demo",
+      "type": "audio",
+      "path": "assets/audio/bgm/bgm_demo.wav",
+      "duration": 16.0,
+      "width": 0,
+      "height": 0,
+      "fps": 0
+    },
+    {
+      "id": "sfx_impact_001",
+      "name": "impact_01",
+      "type": "audio",
+      "path": "assets/audio/impact/impact_01.wav",
+      "duration": 0.6,
+      "width": 0,
+      "height": 0,
+      "fps": 0
+    },
+    {
+      "id": "video_001",
+      "name": "demo_a",
+      "type": "video",
+      "path": "assets/videos/demo/demo_a.mp4",
+      "duration": 10.0,
+      "width": 1080,
+      "height": 1920,
+      "fps": 30.0
+    },
+    {
+      "id": "video_002",
+      "name": "demo_b",
+      "type": "video",
+      "path": "assets/videos/demo/demo_b.mp4",
+      "duration": 10.0,
+      "width": 1080,
+      "height": 1920,
+      "fps": 30.0
+    }
+  ]
+}

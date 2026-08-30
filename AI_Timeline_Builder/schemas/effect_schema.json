@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "effect_schema.json",
+  "title": "Effect Definition Schema",
+  "description": "Effect Library 中每个特效的定义。kind=program 为程序特效，kind=material 为素材特效（依赖 asset）。",
+  "type": "object",
+  "required": ["version", "effects"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "effects": { "type": "array", "items": { "$ref": "#/definitions/effect" } }
+  },
+  "definitions": {
+    "param": {
+      "type": "object",
+      "required": ["key", "label", "type", "default"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "enum": ["number", "int", "bool", "enum", "color", "asset"] },
+        "default": {},
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "asset_type": { "type": "string" },
+        "hint": { "type": "string" }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "required": ["name", "label", "kind", "default_duration", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "写入 Timeline JSON 的稳定标识" },
+        "label": { "type": "string", "description": "中文显示名" },
+        "kind": { "enum": ["program", "material"] },
+        "category": { "type": "string" },
+        "default_duration": { "type": "number", "exclusiveMinimum": 0 },
+        "blend": { "enum": ["normal", "screen", "add"] },
+        "description": { "type": "string" },
+        "params": { "type": "array", "items": { "$ref": "#/definitions/param" } }
+      }
+    }
+  }
+}

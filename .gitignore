@@ -1,0 +1,45 @@
+# ---- 依赖与构建产物 ----
+node_modules/
+.cache/
+dist/
+build/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---- 预览抽帧缓存 / 渲染输出 ----
+AI_Timeline_Builder/.cache/
+AI_Timeline_Builder/out/
+
+# ---- 素材本体不入库 ----
+# 演示素材由 core/demo_project.ensure_demo_media() 首次启动时用 FFmpeg 合成，
+# 导入素材和 TTS 音频是本地私有内容，都不适合放进仓库。
+# 仓库里只保留目录结构（.gitkeep）与 asset_manifest.json 这个 id→路径映射。
+AI_Timeline_Builder/assets/**/*.mp4
+AI_Timeline_Builder/assets/**/*.mov
+AI_Timeline_Builder/assets/**/*.mkv
+AI_Timeline_Builder/assets/**/*.webm
+AI_Timeline_Builder/assets/**/*.wav
+AI_Timeline_Builder/assets/**/*.mp3
+AI_Timeline_Builder/assets/**/*.m4a
+AI_Timeline_Builder/assets/**/*.aac
+AI_Timeline_Builder/assets/**/*.png
+AI_Timeline_Builder/assets/**/*.jpg
+AI_Timeline_Builder/assets/**/*.jpeg
+AI_Timeline_Builder/assets/**/*.webp
+AI_Timeline_Builder/remotion/public/
+
+# my-video 是 Remotion 官方脚手架，自带独立 git 仓库，不纳入本仓库
+my-video/
+
+
+# ---- 系统与编辑器 ----
+Thumbs.db
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
+*.log
