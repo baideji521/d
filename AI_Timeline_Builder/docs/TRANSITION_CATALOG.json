@@ -1,0 +1,385 @@
+{
+  "version": 1,
+  "transitions": [
+    {
+      "name": "fade",
+      "label": "Fade 淡入淡出",
+      "display_category": "基础",
+      "default_duration": 0.5,
+      "description": "经过纯色过渡，最稳的接法",
+      "params": [
+        {
+          "key": "color",
+          "label": "过渡颜色",
+          "type": "color",
+          "default": "#000000"
+        }
+      ],
+      "category": "basic",
+      "renderer": "fade",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "crossfade",
+      "label": "Crossfade 交叉溶解",
+      "display_category": "基础",
+      "default_duration": 0.5,
+      "description": "两个片段直接叠化，没有中间色",
+      "params": [
+        {
+          "key": "easing",
+          "label": "缓动",
+          "type": "enum",
+          "default": "easeInOut",
+          "options": [
+            "linear",
+            "easeIn",
+            "easeOut",
+            "easeInOut"
+          ]
+        }
+      ],
+      "category": "basic",
+      "renderer": "crossfade",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "flash",
+      "label": "Flash 闪白转场",
+      "display_category": "冲击",
+      "default_duration": 0.3,
+      "description": "闪白过渡，节奏点上最常用",
+      "params": [
+        {
+          "key": "color",
+          "label": "闪光颜色",
+          "type": "color",
+          "default": "#FFFFFF"
+        },
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.9,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        }
+      ],
+      "category": "impact",
+      "renderer": "flash",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "whip",
+      "label": "Whip 甩镜",
+      "display_category": "冲击",
+      "default_duration": 0.5,
+      "description": "带模糊的快速横甩，短视频里出现频率最高",
+      "params": [
+        {
+          "key": "direction",
+          "label": "方向",
+          "type": "enum",
+          "default": "left",
+          "options": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "位移强度",
+          "type": "number",
+          "default": 0.8,
+          "min": 0.0,
+          "max": 2.0,
+          "step": 0.05
+        },
+        {
+          "key": "blur",
+          "label": "模糊量",
+          "type": "number",
+          "default": 0.6,
+          "min": 0.0,
+          "max": 2.0,
+          "step": 0.05
+        }
+      ],
+      "category": "impact",
+      "renderer": "whip",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "zoom",
+      "label": "Zoom 缩放转场",
+      "display_category": "冲击",
+      "default_duration": 0.4,
+      "description": "前一段推进、后一段拉出",
+      "params": [
+        {
+          "key": "scale",
+          "label": "缩放倍数",
+          "type": "number",
+          "default": 1.6,
+          "min": 1.0,
+          "max": 5.0,
+          "step": 0.1
+        },
+        {
+          "key": "blur",
+          "label": "模糊量",
+          "type": "number",
+          "default": 0.3,
+          "min": 0.0,
+          "max": 2.0,
+          "step": 0.05
+        }
+      ],
+      "category": "impact",
+      "renderer": "zoom",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "wipe",
+      "label": "Wipe 擦除",
+      "display_category": "几何",
+      "default_duration": 0.5,
+      "description": "沿方向用硬边擦过",
+      "params": [
+        {
+          "key": "direction",
+          "label": "方向",
+          "type": "enum",
+          "default": "left",
+          "options": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ]
+        },
+        {
+          "key": "feather",
+          "label": "边缘羽化 px",
+          "type": "number",
+          "default": 20.0,
+          "min": 0.0,
+          "max": 200.0,
+          "step": 5.0
+        }
+      ],
+      "category": "geometric",
+      "renderer": "wipe",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "slide",
+      "label": "Slide 滑入",
+      "display_category": "几何",
+      "default_duration": 0.5,
+      "description": "新片段滑入，旧片段不动",
+      "params": [
+        {
+          "key": "direction",
+          "label": "方向",
+          "type": "enum",
+          "default": "left",
+          "options": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ]
+        }
+      ],
+      "category": "geometric",
+      "renderer": "slide",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "push",
+      "label": "Push 推移",
+      "display_category": "几何",
+      "default_duration": 0.5,
+      "description": "新片段把旧片段推出画面",
+      "params": [
+        {
+          "key": "direction",
+          "label": "方向",
+          "type": "enum",
+          "default": "left",
+          "options": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ]
+        }
+      ],
+      "category": "geometric",
+      "renderer": "push",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "spin",
+      "label": "Spin 旋转转场",
+      "display_category": "风格",
+      "default_duration": 0.5,
+      "description": "旋转叠加缩放",
+      "params": [
+        {
+          "key": "angle",
+          "label": "旋转角度",
+          "type": "number",
+          "default": 90.0,
+          "min": -720.0,
+          "max": 720.0,
+          "step": 15.0
+        },
+        {
+          "key": "scale",
+          "label": "缩放倍数",
+          "type": "number",
+          "default": 1.3,
+          "min": 1.0,
+          "max": 4.0,
+          "step": 0.1
+        }
+      ],
+      "category": "stylized",
+      "renderer": "spin",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "blur",
+      "label": "Blur 模糊转场",
+      "display_category": "风格",
+      "default_duration": 0.5,
+      "description": "两边都模糊到最大再恢复",
+      "params": [
+        {
+          "key": "amount",
+          "label": "最大模糊 px",
+          "type": "number",
+          "default": 24.0,
+          "min": 0.0,
+          "max": 120.0,
+          "step": 2.0
+        }
+      ],
+      "category": "stylized",
+      "renderer": "blur",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    },
+    {
+      "name": "glitch",
+      "label": "Glitch 故障转场",
+      "display_category": "风格",
+      "default_duration": 0.35,
+      "description": "条带错位切换",
+      "params": [
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.7,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "slices",
+          "label": "条带数量",
+          "type": "int",
+          "default": 14,
+          "min": 2,
+          "max": 60,
+          "step": 1
+        }
+      ],
+      "category": "stylized",
+      "renderer": "glitch",
+      "supported_from": [
+        "video",
+        "freeze"
+      ],
+      "supported_to": [
+        "video",
+        "freeze"
+      ]
+    }
+  ]
+}

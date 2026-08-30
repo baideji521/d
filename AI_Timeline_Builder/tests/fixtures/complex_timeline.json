@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "多轨综合",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 5.0
+  },
+  "tracks": [
+    {
+      "id": "A1",
+      "name": "A1 背景音乐",
+      "kind": "audio"
+    },
+    {
+      "id": "A3",
+      "name": "A3 音效",
+      "kind": "audio"
+    },
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    },
+    {
+      "id": "V4",
+      "name": "V4 高层 Overlay",
+      "kind": "video"
+    },
+    {
+      "id": "T1",
+      "name": "T1 字幕",
+      "kind": "text"
+    },
+    {
+      "id": "T2",
+      "name": "T2 普通文字",
+      "kind": "text"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 2.0,
+      "source": {
+        "start": 0.0,
+        "end": 2.0
+      }
+    },
+    {
+      "id": "clip_002",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo1",
+      "start": 2.0,
+      "duration": 2.0,
+      "source": {
+        "start": 1.0,
+        "end": 3.0
+      }
+    },
+    {
+      "id": "transition_001",
+      "type": "transition",
+      "track": "V1",
+      "name": "wipe",
+      "from": "clip_001",
+      "to": "clip_002",
+      "start": 1.7,
+      "duration": 0.5,
+      "params": {
+        "direction": "left"
+      }
+    },
+    {
+      "id": "overlay_001",
+      "type": "overlay",
+      "track": "V4",
+      "asset": "ov_flash",
+      "start": 1.7,
+      "duration": 0.6
+    },
+    {
+      "id": "effect_001",
+      "type": "effect",
+      "track": "V1",
+      "name": "flash",
+      "start": 1.9,
+      "duration": 0.4,
+      "easing": "easeInOut",
+      "params": {
+        "intensity": 0.7
+      }
+    },
+    {
+      "id": "audio_001",
+      "type": "audio",
+      "track": "A1",
+      "asset": "bgm_demo",
+      "start": 0.0,
+      "duration": 5.0,
+      "source": {
+        "start": 0.0,
+        "end": 5.0
+      },
+      "volume": 0.5
+    },
+    {
+      "id": "audio_002",
+      "type": "audio",
+      "track": "A3",
+      "asset": "sfx_whoosh",
+      "start": 1.7,
+      "duration": 0.7,
+      "source": {
+        "start": 0.0,
+        "end": 0.7
+      }
+    },
+    {
+      "id": "text_001",
+      "type": "text",
+      "track": "T2",
+      "start": 0.3,
+      "duration": 1.4,
+      "content": {
+        "text": "COMPLEX"
+      },
+      "style": {
+        "fontFamily": "Arial",
+        "fontSize": 96,
+        "fontWeight": 900,
+        "color": "#FFFFFF",
+        "align": "center",
+        "stroke": {
+          "width": 8,
+          "color": "#000000"
+        }
+      },
+      "transform": {
+        "y": 0.7
+      }
+    },
+    {
+      "id": "caption_001",
+      "type": "caption",
+      "track": "T1",
+      "start": 2.4,
+      "duration": 2.0,
+      "template": "bold_white",
+      "caption_style": "plain",
+      "content": {
+        "text": "多轨综合用例"
+      },
+      "style": {
+        "fontFamily": "Arial",
+        "fontSize": 64,
+        "fontWeight": 800,
+        "color": "#FFFFFF",
+        "align": "center",
+        "stroke": {
+          "width": 6,
+          "color": "#000000"
+        }
+      },
+      "transform": {
+        "y": 0.82
+      }
+    }
+  ]
+}

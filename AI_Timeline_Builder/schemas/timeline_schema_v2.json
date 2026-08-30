@@ -43,9 +43,25 @@
           "type": "array",
           "description": "时间线标记。纯标注，不参与渲染；缺省即没有标记（保持稀疏）",
           "items": { "$ref": "#/definitions/marker" }
+        },
+        "safe_area": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "安全区档位。缺省即通用档（四边 5%）；只影响提示与自动收位，不改渲染结果",
+          "properties": {
+            "preset": {
+              "enum": ["tiktok", "youtube_shorts", "instagram_reels", "generic"]
+            }
+          }
         }
       }
     },
+
+    "safeAreaLock": {
+      "type": "boolean",
+      "description": "true = 位置必须落在安全区内（RULE_SAFE_AREA_001 会检查）。缺省即 false，保持稀疏"
+    },
+
 
     "marker": {
       "type": "object",
@@ -258,6 +274,7 @@
           }
         },
         "transform": { "$ref": "#/definitions/transform" },
+        "safe_area": { "$ref": "#/definitions/safeAreaLock" },
         "keyframes": { "$ref": "#/definitions/keyframes" },
         "animation": { "type": "string" }
       }
@@ -278,6 +295,7 @@
         "timing": { "$ref": "#/definitions/timing" },
         "asset": { "type": "string" },
         "transform": { "$ref": "#/definitions/transform" },
+        "safe_area": { "$ref": "#/definitions/safeAreaLock" },
         "keyframes": { "$ref": "#/definitions/keyframes" },
         "animation": { "type": "string" }
       }
@@ -302,6 +320,7 @@
           "description": "素材特效的参数（来自 EffectLibrary 里 kind=material 的条目）"
         },
         "transform": { "$ref": "#/definitions/transform" },
+        "safe_area": { "$ref": "#/definitions/safeAreaLock" },
         "keyframes": { "$ref": "#/definitions/keyframes" },
         "animation": { "type": "string" }
       }
@@ -355,6 +374,7 @@
         },
         "style": { "$ref": "#/definitions/textStyle" },
         "transform": { "$ref": "#/definitions/transform" },
+        "safe_area": { "$ref": "#/definitions/safeAreaLock" },
         "keyframes": { "$ref": "#/definitions/keyframes" },
         "animation": { "type": "string" }
       }
@@ -384,6 +404,7 @@
         "highlight": { "$ref": "#/definitions/highlight" },
         "style": { "$ref": "#/definitions/textStyle" },
         "transform": { "$ref": "#/definitions/transform" },
+        "safe_area": { "$ref": "#/definitions/safeAreaLock" },
         "keyframes": { "$ref": "#/definitions/keyframes" },
         "animation": { "type": "string" }
       }
@@ -419,6 +440,7 @@
         "highlight": { "$ref": "#/definitions/highlight" },
         "style": { "$ref": "#/definitions/textStyle" },
         "transform": { "$ref": "#/definitions/transform" },
+        "safe_area": { "$ref": "#/definitions/safeAreaLock" },
         "keyframes": { "$ref": "#/definitions/keyframes" },
         "animation": { "type": "string" }
       }
@@ -440,6 +462,7 @@
         "target": { "type": "string", "description": "冻结哪个视频元素" },
         "source_time": { "type": "number", "minimum": 0, "description": "冻源素材的哪一刻" },
         "transform": { "$ref": "#/definitions/transform" },
+        "safe_area": { "$ref": "#/definitions/safeAreaLock" },
         "keyframes": { "$ref": "#/definitions/keyframes" },
         "animation": { "type": "string" }
       }

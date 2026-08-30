@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "关键帧动画",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 3.0
+  },
+  "tracks": [
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 3.0,
+      "source": {
+        "start": 0.0,
+        "end": 3.0
+      },
+      "keyframes": {
+        "scale": [
+          {
+            "time": 0.0,
+            "value": 1.0
+          },
+          {
+            "time": 1.5,
+            "value": 1.25,
+            "easing": "easeOut"
+          },
+          {
+            "time": 3.0,
+            "value": 1.0,
+            "easing": "easeInOut"
+          }
+        ],
+        "opacity": [
+          {
+            "time": 0.0,
+            "value": 0.4
+          },
+          {
+            "time": 0.8,
+            "value": 1.0,
+            "easing": "easeIn"
+          }
+        ]
+      }
+    }
+  ]
+}

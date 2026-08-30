@@ -42,13 +42,18 @@ if ROOT not in sys.path:
 
 from core import markers as mk  # noqa: E402
 from core import resolution as res  # noqa: E402
+from core import rule_engine as rules_mod  # noqa: E402
+from core import safe_area as safe  # noqa: E402
 from core import sparse  # noqa: E402
 from core import timeline as tl  # noqa: E402
+from core import voice as voice_mod  # noqa: E402
+from core.editing_planner import ACTIONS, action_catalog  # noqa: E402
 from core.timeline_validator import TimelineValidator  # noqa: E402
 from gui import asset_placement as ap  # noqa: E402
 from gui import shortcuts as sc  # noqa: E402
 from gui.timeline_coordinate import PERCENT_STEPS, PPS_AT_100  # noqa: E402
 from gui.timeline_snap import MAX_SNAP_SECONDS, SNAP_PIXELS  # noqa: E402
+from libraries.asset_registry import AssetRegistry  # noqa: E402
 from libraries.effect_library import EffectLibrary  # noqa: E402
 from libraries.sound_library import SoundLibrary  # noqa: E402
 from libraries.transition_library import TransitionLibrary  # noqa: E402
@@ -56,6 +61,7 @@ from libraries.transition_library import TransitionLibrary  # noqa: E402
 DOCS = os.path.join(ROOT, "docs")
 ASSETS_DIR = os.path.join(ROOT, "assets")
 MANIFEST = os.path.join(ROOT, "asset_manifest.json")
+RULES_PATH = os.path.join(ROOT, "schemas", "rules.json")
 DISCOVER = os.path.join(ROOT, "out", "acceptance", "discover_renderers.mjs")
 
 GENERATED_BY = "由 `python tools/build_catalog.py` 扫描真实注册表生成，**请勿手改**。"
@@ -738,7 +744,9 @@ def build_ai_catalog(effects, transitions, sounds: SoundLibrary,
                     "id": aspect_id,
                     "label": res.label_of(aspect_id),
                     "ratio": list(res.get_aspect(aspect_id)["ratio"]),
+                    "default": list(res.default_resolution(aspect_id)),
                     "resolutions": [list(size) for size in res.resolutions_for(aspect_id)],
+                    "tiers": [res.tier_of(w, h) for w, h in res.resolutions_for(aspect_id)],
                 }
                 for aspect_id in res.aspect_ids()
             ],
@@ -759,15 +767,384 @@ def build_ai_catalog(effects, transitions, sounds: SoundLibrary,
     }
 
 
+# ---------------------------------------------------------------- 阶段十四新增
+#
+# 这一段负责三份「AI 只准照着这个来」的文件：
+#
+#   docs/SFX_CATALOG.{md,json}      音效能力清单（AI 只能从里面挑）
+#   docs/AI_CAPABILITIES.{md,json}  能力白名单总表
+#   docs/AI_SYSTEM_PROMPT.md        直接可粘给模型的系统提示
+#
+# 三份都从**真实注册表**生成，不手写第二份数据。
+
+
+def _json_payload(payload: Any) -> str:
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
+
+def build_sfx_catalog_json(registry: AssetRegistry) -> Dict[str, Any]:
+    """音效清单（指令第八条的形状）：id / name / path / duration / category / tags。"""
+    rows: List[Dict[str, Any]] = []
+    for record in registry.search(semantic="sfx"):
+        row = {
+            "id": record["id"],
+            "name": record["name"],
+            "path": record["path"],
+            "category": record["category"],
+            "tags": record["tags"],
+        }
+        if record.get("duration"):
+            row["duration"] = record["duration"]
+        rows.append(row)
+    categories = sorted({r["category"] for r in rows if r["category"]})
+    return {
+        "version": 1,
+        "note": "AI 只能从本清单里挑音效；编造 asset id 会被 RULE_ASSET_001 拦下",
+        "total": len(rows),
+        "categories": [
+            {
+                "key": key,
+                "count": sum(1 for r in rows if r["category"] == key),
+                "default_track": "A3",
+            }
+            for key in categories
+        ],
+        "element_shape": {
+            "type": "audio",
+            "track": "A3",
+            "asset": "<清单里的 id>",
+            "start": 12.3,
+            "duration": 0.8,
+        },
+        "sound_effects": rows,
+    }
+
+
+def build_sfx_catalog_md(payload: Dict[str, Any], registry: AssetRegistry) -> str:
+    lines = [
+        "# 音效能力清单 SFX Catalog",
+        "",
+        GENERATED_BY,
+        "",
+        f"共 {payload['total']} 个音效，{len(payload['categories'])} 个分类。",
+        "全部落在 `A3 音效` 轨；AI 只能从本清单挑，编造 id 会被 `RULE_ASSET_001` 拦下。",
+        "",
+        "## 分类总览",
+        "",
+        "| 分类 | 数量 | 默认轨道 |",
+        "| --- | --- | --- |",
+    ]
+    for row in payload["categories"]:
+        lines.append(f"| `{row['key']}` | {row['count']} | `{row['default_track']}` |")
+    lines.append("")
+    lines.append("## 逐条清单")
+    lines.append("")
+    for category in payload["categories"]:
+        key = category["key"]
+        lines.append(f"### `{key}`（{category['count']} 个）")
+        lines.append("")
+        lines.append("| id | 文件 | 时长 | 标签 |")
+        lines.append("| --- | --- | --- | --- |")
+        for row in payload["sound_effects"]:
+            if row["category"] != key:
+                continue
+            duration = f"{row['duration']:.2f}s" if row.get("duration") else "—"
+            lines.append(
+                f"| `{row['id']}` | `{row['path']}` | {duration} | "
+                f"{' '.join(f'`{t}`' for t in row['tags'])} |"
+            )
+        lines.append("")
+    missing = registry.missing_files()
+    lines.append("## 完整性")
+    lines.append("")
+    lines.append(
+        f"清单里的文件全部经过磁盘存在性检查：缺失 {len(missing)} 个。"
+        if not missing
+        else f"**缺失 {len(missing)} 个文件**：" + ", ".join(m["id"] for m in missing)
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_ai_capabilities(
+    media: Dict[str, Any],
+    effects: EffectLibrary,
+    transitions: TransitionLibrary,
+    registry: AssetRegistry,
+    sfx: Dict[str, Any],
+) -> Dict[str, Any]:
+    """AI 能力白名单（指令第九、三十条）。
+
+    `media` 直接复用 AI_MEDIA_CATALOG.json 的内容 —— 不另写一份元素 / 特效 /
+    转场的描述，否则两份数据必然漂移。本函数只负责把「AI 视角还缺的部分」补上：
+    动作白名单、规则、安全区、语音 provider、素材统计、示例库。
+    """
+    return {
+        "version": 1,
+        "note": (
+            "AI 剪辑能力白名单。AI 只能使用这里列出的能力与参数；"
+            "凡是这里没有的特效 / 转场 / 音效 / 动作，一律视为非法。"
+        ),
+        "contract": media.get("contract", {}),
+        "pipeline": [
+            "AI 输出 EditingDecision（做什么 / 什么时候 / 多久 / 为什么）",
+            "core/editing_planner.py 展开成 Timeline 元素",
+            "core/timeline_validator.py 校验（Schema + 语义 + Registry + Rule Engine）",
+            "Remotion Runtime 渲染成 MP4",
+            "ffprobe / 抽帧 / 音频探针验收",
+        ],
+        "media": media,
+        "actions": {
+            "note": "AI 只能表达这些动作；未列出的动作会被 Planner 报 UNKNOWN_ACTION",
+            "whitelist": list(ACTIONS),
+            "detail": action_catalog(),
+            "decision_shape": {
+                "action": "zoom",
+                "target": "clip_003",
+                "start": 12.4,
+                "duration": 0.6,
+                "params": {"scale_to": 1.2},
+                "reason": "强调反应瞬间",
+            },
+        },
+        "rules": {
+            "note": "校验规则全表。level=error 会阻止导出，warning 只提示",
+            "source": "schemas/rules.json",
+            "items": rules_mod.rule_catalog(RULES_PATH),
+            "max_clip_seconds": rules_mod.MAX_CLIP_SECONDS,
+            "closing_clip_exempt": rules_mod.CLOSING_CLIP_EXEMPT,
+        },
+        "safe_area": {
+            "note": (
+                "元素写 safe_area: true 才受约束；内缩比例是各平台界面的实测估算值，"
+                "不是平台官方规范，只用于提示与自动收位，不改渲染结果"
+            ),
+            "location": "meta.safe_area.preset",
+            "default": safe.DEFAULT_PRESET_ID,
+            "presets": safe.catalog(),
+        },
+        "voice": {
+            "note": (
+                "配音走 VoiceProvider 抽象，不绑定任何一家 TTS。"
+                "timing_source=estimated 表示逐词时间戳是按字符比例估算的，不是引擎给的"
+            ),
+            "params": list(voice_mod.VOICE_PARAMS),
+            "styles": list(voice_mod.STYLES),
+            "languages": list(voice_mod.PRIMARY_LANGUAGES),
+            "genders": list(voice_mod.GENDERS),
+            "providers": voice_mod.catalog(),
+        },
+        "assets": {
+            "note": "素材语义类型与建议轨道。AI 只能引用清单里已有的 asset id",
+            "summary": registry.summary(),
+            "sfx_categories": [row["key"] for row in sfx["categories"]],
+        },
+        "resolutions": media.get("resolutions", {}),
+        "examples": {
+            "note": "tests/fixtures/ 下每份都过校验、且每轮验收都真实渲染成 MP4",
+            "fixtures": sorted(
+                os.path.splitext(f)[0]
+                for f in os.listdir(os.path.join(ROOT, "tests", "fixtures"))
+                if f.endswith(".json")
+            )
+            if os.path.isdir(os.path.join(ROOT, "tests", "fixtures"))
+            else [],
+        },
+    }
+
+
+def build_ai_capabilities_md(payload: Dict[str, Any]) -> str:
+    media = payload["media"]
+    effects = media.get("effects") or []
+    transitions = media.get("transitions") or []
+    program = [e for e in effects if e.get("kind") == "program"]
+    material = [e for e in effects if e.get("kind") != "program"]
+    lines = [
+        "# AI 剪辑能力白名单 AI_CAPABILITIES",
+        "",
+        GENERATED_BY,
+        "",
+        "> AI 只能使用本文件列出的能力与参数。**没列的就是不存在的**：",
+        "> 未注册的特效 / 转场会被 Validator 报错，编造的 asset id 会被拦下，",
+        "> 白名单外的动作会被 Editing Planner 报 `UNKNOWN_ACTION`。",
+        "",
+        "## 链路",
+        "",
+    ]
+    for index, step in enumerate(payload["pipeline"], start=1):
+        lines.append(f"{index}. {step}")
+    lines += ["", "## 动作白名单", "", "| 动作 | 说明 | 需要 target | 备注 |",
+              "| --- | --- | --- | --- |"]
+    for row in payload["actions"]["detail"]:
+        extra: List[str] = []
+        if row.get("expands_to"):
+            extra.append("展开为 " + " + ".join(f"`{s}`" for s in row["expands_to"]))
+        if row.get("requires_registry_name"):
+            extra.append("name 必须在 Registry 里")
+        if row.get("requires_asset"):
+            extra.append("必须给 asset")
+        lines.append(
+            f"| `{row['action']}` | {row['label']} | "
+            f"{'是' if row['requires_target'] else '否'} | {'；'.join(extra) or '—'} |"
+        )
+    lines += ["", "决策形状：", ""] + _json_block(payload["actions"]["decision_shape"])
+
+    lines += ["", "## 元素类型", "", "| type | 说明 |", "| --- | --- |"]
+    for key, label in (media.get("element_types") or {}).items():
+        lines.append(f"| `{key}` | {label} |")
+
+    lines += [
+        "",
+        "## 特效 / 转场",
+        "",
+        f"- 程序特效 {len(program)} 个，素材特效 {len(material)} 个"
+        " —— 逐条参数见 `EFFECT_CATALOG.md`",
+        f"- 转场 {len(transitions)} 个 —— 逐条参数见 `TRANSITION_CATALOG.md`",
+        f"- 音效 {payload['assets']['summary']['by_type'].get('sfx', 0)} 个 —— "
+        "逐条清单见 `SFX_CATALOG.md`",
+        "",
+        "## 画面比例",
+        "",
+        "| 比例 | 默认分辨率 | 可选档位 |",
+        "| --- | --- | --- |",
+    ]
+    for aspect in (payload["resolutions"].get("aspects") or []):
+        options = "、".join(f"{w}×{h}" for w, h in aspect.get("resolutions", []))
+        default = aspect.get("default") or []
+        lines.append(
+            f"| `{aspect['id']}` | "
+            f"{f'{default[0]}×{default[1]}' if default else '—'} | {options} |"
+        )
+
+    lines += ["", "## 安全区", "", payload["safe_area"]["note"], "",
+              "| 档位 | 说明 | x 范围 | y 范围 |", "| --- | --- | --- | --- |"]
+    for preset in payload["safe_area"]["presets"]:
+        box = preset["box"]
+        lines.append(
+            f"| `{preset['id']}` | {preset['note']} | "
+            f"{box['left']:.2f} ~ {box['right']:.2f} | {box['top']:.2f} ~ {box['bottom']:.2f} |"
+        )
+
+    lines += ["", "## 规则", "", payload["rules"]["note"],
+              f"（普通片段上限 {payload['rules']['max_clip_seconds']:g}s，"
+              f"收尾片段豁免：{'是' if payload['rules']['closing_clip_exempt'] else '否'}）",
+              "", "| 规则 | 级别 | 说明 |", "| --- | --- | --- |"]
+    for rule in payload["rules"]["items"]:
+        level = {"error": "错误", "warning": "警告"}.get(rule["level"], rule["level"])
+        suffix = "（豁免条件）" if rule["kind"] == "exemption" else ""
+        lines.append(f"| `{rule['id']}` | {level} | {rule['description']}{suffix} |")
+
+    lines += ["", "## 配音", "", payload["voice"]["note"], "",
+              "| provider | 逐词时间戳 | 支持参数 |", "| --- | --- | --- |"]
+    for provider in payload["voice"]["providers"]:
+        lines.append(
+            f"| `{provider['id']}` | "
+            f"{'引擎提供' if provider['supports_word_timestamps'] else '估算'} | "
+            f"{' '.join(f'`{p}`' for p in provider['supported_params'])} |"
+        )
+
+    lines += ["", "## 示例库", "", payload["examples"]["note"], ""]
+    for name in payload["examples"]["fixtures"]:
+        lines.append(f"- `tests/fixtures/{name}.json`")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_ai_system_prompt(payload: Dict[str, Any], effects: EffectLibrary,
+                          transitions: TransitionLibrary) -> str:
+    """可直接粘给模型的系统提示（指令第四十八条）。"""
+    program = sorted(d.name for d in effects.all() if d.element_type == "effect")
+    material = sorted(d.name for d in effects.all() if d.element_type != "effect")
+    lines = [
+        "# AI 剪辑系统提示 AI_SYSTEM_PROMPT",
+        "",
+        GENERATED_BY,
+        "",
+        "把以下内容作为系统提示交给模型。所有清单都是从真实注册表生成的，",
+        "改了注册表就重新跑生成器，不要手改本文件。",
+        "",
+        "---",
+        "",
+        "你是一个短视频剪辑决策器。你的输出**只能**是 JSON 决策列表，",
+        "不允许输出 TSX / React / 任何渲染代码，也不允许直接编辑 Timeline JSON。",
+        "",
+        "## 你的输出格式",
+        "",
+    ]
+    lines += _json_block(
+        {
+            "decisions": [
+                payload["actions"]["decision_shape"],
+                {
+                    "action": "highlight",
+                    "start": 24.0,
+                    "params": {"text": "LOOK AT THIS"},
+                    "reason": "情绪最高点，需要强调",
+                },
+            ]
+        }
+    )
+    lines += [
+        "",
+        "## 你能做的动作",
+        "",
+        "".join(f"`{a}` " for a in payload["actions"]["whitelist"]).strip(),
+        "",
+        "`highlight` 会被自动展开为："
+        + " + ".join(f"`{s}`" for s in
+                     next(r for r in payload["actions"]["detail"]
+                          if r["action"] == "highlight")["expands_to"]),
+        "",
+        "## 你能用的程序特效（写在 params.name）",
+        "",
+        " ".join(f"`{n}`" for n in program),
+        "",
+        "以下是**素材特效**，必须用 `overlay` 动作，不能当程序特效：",
+        "",
+        " ".join(f"`{n}`" for n in material) or "（无）",
+        "",
+        "## 你能用的转场（写在 params.name）",
+        "",
+        " ".join(f"`{n}`" for n in sorted(transitions.names())),
+        "",
+        "## 你能用的音效分类",
+        "",
+        " ".join(f"`{c}`" for c in payload["assets"]["sfx_categories"]),
+        "",
+        "具体 id 见 `docs/SFX_CATALOG.json`。不给 asset 时系统会按分类自动挑一个。",
+        "",
+        "## 硬性规则",
+        "",
+        "1. 时间单位一律是**秒**，不要出现帧。",
+        "2. 不要发明特效 / 转场 / 音效 / 动作名，也不要发明参数名。",
+        f"3. 普通片段不要超过 {payload['rules']['max_clip_seconds']:g} 秒"
+        "（每条轨最后一个收尾片段除外）。",
+        "4. 需要摆位置的元素（字幕 / 标题 / 贴纸）如果要求不被平台 UI 压住，",
+        "   在 params 里写 `safe_area: true`，系统会自动收进安全区。",
+        "5. 每条决策都要写 `reason`，说明为什么这么剪。",
+        "6. 参数取值必须落在能力表给的范围内；超范围会被 Validator 拦下。",
+        "",
+        "## 完整能力表",
+        "",
+        "见 `docs/AI_CAPABILITIES.json`（机器读）与 `docs/AI_CAPABILITIES.md`（人读）。",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------- main
+
 
 
 def build_all() -> Dict[str, str]:
     effects = EffectLibrary(ASSETS_DIR)
     transitions = TransitionLibrary(ASSETS_DIR)
     sounds = SoundLibrary.from_manifest(MANIFEST)
+    registry = AssetRegistry.from_manifest(MANIFEST)
     runtime, note = discover_renderers()
     catalog = build_ai_catalog(effects, transitions, sounds, runtime, note)
+    sfx = build_sfx_catalog_json(registry)
+    capabilities = build_ai_capabilities(catalog, effects, transitions, registry, sfx)
     return {
         "EFFECT_CATALOG.md": build_effect_catalog(effects, runtime, note),
         "TRANSITION_CATALOG.md": build_transition_catalog(transitions, runtime, note),
@@ -775,7 +1152,14 @@ def build_all() -> Dict[str, str]:
         "RESOLUTION_GUIDE.md": build_resolution_guide(),
         "TIMELINE_GUI_GUIDE.md": build_gui_guide(),
         "TIMELINE_JSON_EXAMPLES.md": build_json_examples(sounds),
-        "AI_MEDIA_CATALOG.json": json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+        "AI_MEDIA_CATALOG.json": _json_payload(catalog),
+        "EFFECT_CATALOG.json": _json_payload(effects.export_definitions()),
+        "TRANSITION_CATALOG.json": _json_payload(transitions.export_definitions()),
+        "SFX_CATALOG.json": _json_payload(sfx),
+        "SFX_CATALOG.md": build_sfx_catalog_md(sfx, registry),
+        "AI_CAPABILITIES.json": _json_payload(capabilities),
+        "AI_CAPABILITIES.md": build_ai_capabilities_md(capabilities),
+        "AI_SYSTEM_PROMPT.md": build_ai_system_prompt(capabilities, effects, transitions),
     }
 
 

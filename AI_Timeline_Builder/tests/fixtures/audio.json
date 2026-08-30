@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "BGM 与音效",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 3.0
+  },
+  "tracks": [
+    {
+      "id": "A1",
+      "name": "A1 背景音乐",
+      "kind": "audio"
+    },
+    {
+      "id": "A3",
+      "name": "A3 音效",
+      "kind": "audio"
+    },
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 3.0,
+      "source": {
+        "start": 0.0,
+        "end": 3.0
+      }
+    },
+    {
+      "id": "audio_001",
+      "type": "audio",
+      "track": "A1",
+      "asset": "bgm_demo",
+      "start": 0.0,
+      "duration": 3.0,
+      "source": {
+        "start": 0.0,
+        "end": 3.0
+      },
+      "volume": 0.6,
+      "fade": {
+        "in": 0.3,
+        "out": 0.5
+      }
+    },
+    {
+      "id": "audio_002",
+      "type": "audio",
+      "track": "A3",
+      "asset": "sfx_impact",
+      "start": 1.0,
+      "duration": 0.8,
+      "source": {
+        "start": 0.0,
+        "end": 0.8
+      }
+    }
+  ]
+}

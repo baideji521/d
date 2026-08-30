@@ -38,7 +38,12 @@ from core import sparse
 
 
 from core import timeline as tl
-from core.migrations import detect_version, migrate_to_v1, migrate_v1_to_v2
+from core.migrations import (
+    detect_version,
+    downgrade_losses,
+    migrate_to_v1,
+    migrate_v1_to_v2,
+)
 from core.time_utils import snap_to_frame
 
 #: 需要在 _normalize() 里被压成数字的顶层标量字段
@@ -281,10 +286,15 @@ class TimelineModel(QObject):
         """
         self._begin(description)
         incoming = copy.deepcopy(data) if isinstance(data, dict) else {}
-        # v2 文档也能直接灌进来：运行时统一降级成 v1
+        # v2 文档也能直接灌进来：运行时统一降级成 v1。
+        # 降级会丢掉分组信息，所以先把损失列出来再降 —— 丢可以，静默不行。
+        losses: List[Dict[str, str]] = []
         if isinstance(data, dict) and detect_version(data) >= 2:
+            losses = downgrade_losses(incoming)
             incoming = migrate_to_v1(incoming)
         report = self.validate_report(incoming)
+        if losses:
+            report["downgrade_losses"] = losses
 
         self._timeline = incoming
         self._normalize()
@@ -294,6 +304,10 @@ class TimelineModel(QObject):
             f"{description}：{len(self._timeline.get('elements', []))} 个元素，"
             f"{len(self._timeline.get('tracks', []))} 条轨道"
         )
+        for loss in losses:
+            self.logMessage.emit(
+                f"　降级丢失 {loss.get('element')}.{loss.get('field')}：{loss.get('message')}"
+            )
         for error in report.get("errors", []):
             self.logMessage.emit(f"　校验错误 {error.get('rule')}：{error.get('message')}")
         for warning in report.get("warnings", []):

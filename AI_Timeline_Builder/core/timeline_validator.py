@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from core import timeline as tl
 from core.migrations import detect_version, migrate_to_v1
+from core.rule_engine import RuleEngine, load_rule_definitions
 
 try:  # jsonschema 是可选依赖
     import jsonschema  # type: ignore
@@ -69,6 +70,8 @@ class TimelineValidator:
         self._easings: List[str] = list(tl.EASINGS)
         self._schema: Optional[Dict[str, Any]] = None
         self._schema_v2: Optional[Dict[str, Any]] = None
+        #: 剪辑级规则引擎。rules.json 缺失时也要有一个空引擎，调用点不必判空。
+        self._rule_engine = RuleEngine()
         self._load_rules()
         self._load_schema()
 
@@ -84,6 +87,8 @@ class TimelineValidator:
             self._rules[rule["id"]] = rule
         self._keyframe_params = data.get("keyframe_params", self._keyframe_params)
         self._easings = data.get("easings", self._easings)
+        # 剪辑级规则（片段长度 / 安全区）交给 RuleEngine，level 仍由本文件的 rules 表提供
+        self._rule_engine = RuleEngine(load_rule_definitions(path))
 
     def _load_schema(self) -> None:
         """v1 与 v2 各一份 schema，按文档里的 version 选用。"""
@@ -175,7 +180,26 @@ class TimelineValidator:
             issues.extend(self._validate_keyframes(element))
             issues.extend(self._validate_transform(element))
 
+        issues.extend(self._validate_rules(timeline))
+
         return issues
+
+    def _validate_rules(self, timeline: Dict[str, Any]) -> List[Issue]:
+        """剪辑级规则（RULE_CLIP_* / RULE_SAFE_AREA_*）。
+
+        实现在 core/rule_engine.py，这里只把 Finding 翻译成 Issue 并按
+        rules.json 补 level —— level 只有一处来源。
+        """
+        return [
+            Issue(
+                finding.rule_id,
+                self._level(finding.rule_id),
+                finding.message,
+                finding.element_id,
+                list(finding.path),
+            )
+            for finding in self._rule_engine.check(timeline)
+        ]
 
     def errors_only(self, timeline: Dict[str, Any]) -> List[Issue]:
         return [i for i in self.validate(timeline) if i.is_error()]

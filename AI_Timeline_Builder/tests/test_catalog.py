@@ -22,18 +22,26 @@ if TOOLS not in sys.path:
 
 import build_catalog as bc  # noqa: E402
 
+from core import resolution as res  # noqa: E402
 from libraries.effect_library import EffectLibrary  # noqa: E402
 from libraries.sound_library import SoundLibrary  # noqa: E402
 from libraries.transition_library import TransitionLibrary  # noqa: E402
 
 EXPECTED_FILES = {
     "EFFECT_CATALOG.md",
+    "EFFECT_CATALOG.json",
     "TRANSITION_CATALOG.md",
+    "TRANSITION_CATALOG.json",
     "SOUND_EFFECT_CATALOG.md",
+    "SFX_CATALOG.md",
+    "SFX_CATALOG.json",
     "RESOLUTION_GUIDE.md",
     "TIMELINE_GUI_GUIDE.md",
     "TIMELINE_JSON_EXAMPLES.md",
     "AI_MEDIA_CATALOG.json",
+    "AI_CAPABILITIES.md",
+    "AI_CAPABILITIES.json",
+    "AI_SYSTEM_PROMPT.md",
 }
 
 
@@ -94,8 +102,14 @@ def test_ai目录的音效元素样例是稀疏的(catalog):
 
 
 def test_ai目录带上分辨率与标记(catalog):
+    """比例档位不在这里另写一份，直接与 core/resolution.py 对齐。
+
+    写死集合的坏处在阶段十四暴露过一次：档位表加了 16:9 / 1:1 之后，
+    这条断言红的原因不是能力错了，而是断言自己成了第二份真相。
+    """
     aspects = {a["id"] for a in catalog["resolutions"]["aspects"]}
-    assert aspects == {"3:4", "9:16"}
+    assert aspects == set(res.aspect_ids())
+    assert {"3:4", "9:16", "16:9", "1:1"} <= aspects
     assert catalog["markers"]["location"] == "meta.markers"
 
 

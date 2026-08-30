@@ -1,6 +1,6 @@
 {
   "time_unit": "seconds",
-  "description": "Timeline 规则引擎配置。所有规则由 core/timeline_validator.py 实现，id 与此文件一一对应。",
+  "description": "Timeline 规则引擎配置。语义规则由 core/timeline_validator.py 实现，剪辑级规则（CLIP / SAFE_AREA）由 core/rule_engine.py 实现，id 与此文件一一对应。kind=exemption 的条目只描述豁免条件，本身不产出问题。",
   "rules": [
     {
       "id": "RULE_TIME_001",
@@ -186,6 +186,22 @@
       "id": "RULE_AUDIO_002",
       "level": "warning",
       "description": "fade.in + fade.out 不应超过 duration"
+    },
+    {
+      "id": "RULE_CLIP_001",
+      "level": "warning",
+      "description": "普通视频片段时长不应超过 15 秒"
+    },
+    {
+      "id": "RULE_CLIP_002",
+      "level": "warning",
+      "kind": "exemption",
+      "description": "每条视频轨上最后一个片段（收尾片段）允许超过 15 秒，不受 RULE_CLIP_001 限制"
+    },
+    {
+      "id": "RULE_SAFE_AREA_001",
+      "level": "error",
+      "description": "声明了 safe_area 的元素，其 transform 位置必须落在当前平台安全区内"
     }
   ],
   "keyframe_params": [

@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (
 )
 
 from core import resolution as res
+from core import safe_area as sa
 
 FPS_PRESETS = [24.0, 25.0, 30.0, 50.0, 60.0]
 
@@ -86,6 +87,15 @@ class ProjectSettingsDialog(QDialog):
             self._background.addItem(preset)
         self._background.setEditText(str(meta.get("background", "#000000")))
 
+        # 安全区档位：只影响**预览参考框**，不改画面、不进渲染。
+        # 各平台四边内缩不一样（抖音右侧按钮列最宽），数值在 core/safe_area.py。
+        self._safe_area = QComboBox()
+        for preset in sa.catalog():
+            self._safe_area.addItem(preset["label"], preset["id"])
+        current_preset = sa.timeline_preset({"meta": meta})
+        preset_index = self._safe_area.findData(current_preset)
+        self._safe_area.setCurrentIndex(max(0, preset_index))
+
         hint = QLabel(
             "时间线里所有时间都以秒为单位；fps 只用于帧对齐与最终渲染。\n"
             "分辨率会写进 meta.width / meta.height，一路走到 Remotion 与最终 MP4。"
@@ -101,6 +111,7 @@ class ProjectSettingsDialog(QDialog):
         form.addRow("宽度（meta.width）", self._width)
         form.addRow("高度（meta.height）", self._height)
         form.addRow("背景色（meta.background）", self._background)
+        form.addRow("安全区档位（meta.safe_area）", self._safe_area)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -142,7 +153,9 @@ class ProjectSettingsDialog(QDialog):
         self._resolution.blockSignals(True)
         self._resolution.clear()
         for width, height in res.resolutions_for(aspect_id):
-            self._resolution.addItem(f"{width}×{height}", (width, height))
+            self._resolution.addItem(
+                f"{width}×{height}（{res.tier_label(width, height)}）", (width, height)
+            )
         self._resolution.addItem("自定义", None)
         matched = self._index_of_resolution(keep)
         self._resolution.setCurrentIndex(matched if matched >= 0 else 0)
@@ -179,6 +192,10 @@ class ProjectSettingsDialog(QDialog):
             "width": int(self._width.value()),
             "height": int(self._height.value()),
             "background": self._background.currentText().strip() or "#000000",
+            # 通用档也照实写进 meta；落盘时 core/sparse.py 会把默认值那一份删掉，
+            # 所以「改成抖音再改回通用」不会留下残渣。
+            "safe_area": {"preset": str(self._safe_area.currentData()
+                                        or sa.DEFAULT_PRESET_ID)},
         }
 
 

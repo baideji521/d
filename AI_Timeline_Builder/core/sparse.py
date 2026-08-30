@@ -22,6 +22,7 @@ from __future__ import annotations
 import copy
 from typing import Any, Dict, List, Optional, Set
 
+from core import safe_area as sa
 from core import timeline as tl
 
 # ---------------------------------------------------------------- 省略规则
@@ -264,6 +265,13 @@ def _sparse_meta(meta: Dict[str, Any]) -> Dict[str, Any]:
     # 标记是用户显式意图，原样保留；但空列表等于「没有标记」，不落盘（稀疏规则 6）
     if isinstance(result.get("markers"), list) and not result["markers"]:
         del result["markers"]
+    # 安全区档位：通用档就是默认值，写进 JSON 等于凭空多一个字段。
+    # 用户改成抖音 / Shorts / Reels 才落盘，改回通用要再删掉。
+    safe = result.get("safe_area")
+    if isinstance(safe, dict):
+        if not safe or (list(safe) == ["preset"]
+                        and _same(safe.get("preset"), sa.DEFAULT_PRESET_ID)):
+            del result["safe_area"]
     return result
 
 

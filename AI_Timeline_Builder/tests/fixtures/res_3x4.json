@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "比例 3:4",
+    "fps": 30.0,
+    "width": 1080,
+    "height": 1440,
+    "duration": 2.5
+  },
+  "tracks": [
+    {
+      "id": "A1",
+      "name": "A1 背景音乐",
+      "kind": "audio"
+    },
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    },
+    {
+      "id": "T1",
+      "name": "T1 字幕",
+      "kind": "text"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 1.2,
+      "source": {
+        "start": 0.0,
+        "end": 1.2
+      }
+    },
+    {
+      "id": "clip_002",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo1",
+      "start": 1.2,
+      "duration": 1.3,
+      "source": {
+        "start": 0.0,
+        "end": 1.3
+      }
+    },
+    {
+      "id": "transition_001",
+      "type": "transition",
+      "track": "V1",
+      "name": "fade",
+      "from": "clip_001",
+      "to": "clip_002",
+      "start": 1.0,
+      "duration": 0.4
+    },
+    {
+      "id": "effect_001",
+      "type": "effect",
+      "track": "V1",
+      "name": "zoom",
+      "start": 0.2,
+      "duration": 0.6,
+      "easing": "easeInOut",
+      "params": {
+        "scale_from": 1.0,
+        "scale_to": 1.2
+      },
+      "target": "clip_001"
+    },
+    {
+      "id": "audio_001",
+      "type": "audio",
+      "track": "A1",
+      "asset": "bgm_demo",
+      "start": 0.0,
+      "duration": 2.5,
+      "source": {
+        "start": 0.0,
+        "end": 2.5
+      },
+      "volume": 0.5
+    },
+    {
+      "id": "caption_001",
+      "type": "caption",
+      "track": "T1",
+      "start": 0.3,
+      "duration": 1.4,
+      "template": "bold_white",
+      "caption_style": "plain",
+      "content": {
+        "text": "1080×1440"
+      },
+      "style": {
+        "fontFamily": "Arial",
+        "fontSize": 64,
+        "fontWeight": 800,
+        "color": "#FFFFFF",
+        "align": "center",
+        "stroke": {
+          "width": 6,
+          "color": "#000000"
+        }
+      },
+      "transform": {
+        "y": 0.82
+      }
+    }
+  ]
+}

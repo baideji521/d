@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "基础单视频",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 3.0
+  },
+  "tracks": [
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 3.0,
+      "source": {
+        "start": 0.0,
+        "end": 3.0
+      }
+    }
+  ]
+}

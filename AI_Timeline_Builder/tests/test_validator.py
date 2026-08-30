@@ -13,6 +13,7 @@ import os
 
 import pytest
 
+from core import rule_engine
 from core import timeline as tl
 from core import timeline_validator as tv
 
@@ -42,12 +43,20 @@ def test_validator_加载到了_schema_与规则(validator):
 
 
 def test_rules_json_与实现一一对应(validator):
+    """声明 ↔ 实现必须双向对齐。
+
+    阶段十四把剪辑级规则（CLIP / SAFE_AREA）挪进 core/rule_engine.py 之后，
+    只扫 timeline_validator.py 已经不够 —— 改成用 rule_engine 的
+    consistency_report()，它同时检查两个方向，并把 kind=exemption
+    （只描述豁免条件、本身不产出问题）单独放行。
+    """
+    report = rule_engine.consistency_report(
+        ROOT, os.path.join(ROOT, "schemas", "rules.json")
+    )
+    assert report["declared_not_implemented"] == [], "声明了却没有实现（假合规）"
+    assert report["implemented_not_declared"] == [], "实现里在报但 rules.json 没声明"
     declared = {rule["id"] for rule in validator.all_rules()}
-    source = open(
-        os.path.join(ROOT, "core", "timeline_validator.py"), "r", encoding="utf-8"
-    ).read()
-    for rule_id in declared:
-        assert f'"{rule_id}"' in source, f"{rule_id} 在 rules.json 声明了但没实现"
+    assert declared == set(report["declared"]) | set(report["exemptions"])
 
 
 # ---------------------------------------------------------------- 合规基线

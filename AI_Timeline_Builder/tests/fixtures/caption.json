@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "整句字幕",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 3.0,
+    "safe_area": {
+      "preset": "tiktok"
+    }
+  },
+  "tracks": [
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    },
+    {
+      "id": "T1",
+      "name": "T1 字幕",
+      "kind": "text"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 3.0,
+      "source": {
+        "start": 0.0,
+        "end": 3.0
+      }
+    },
+    {
+      "id": "caption_001",
+      "type": "caption",
+      "track": "T1",
+      "start": 0.4,
+      "duration": 2.0,
+      "template": "bold_white",
+      "caption_style": "plain",
+      "content": {
+        "text": "整句字幕"
+      },
+      "style": {
+        "fontFamily": "Arial",
+        "fontSize": 64,
+        "fontWeight": 800,
+        "color": "#FFFFFF",
+        "align": "center",
+        "stroke": {
+          "width": 6,
+          "color": "#000000"
+        }
+      },
+      "transform": {
+        "y": 0.79
+      },
+      "safe_area": true
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "逐词字幕",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 3.0
+  },
+  "tracks": [
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    },
+    {
+      "id": "T1",
+      "name": "T1 字幕",
+      "kind": "text"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 3.0,
+      "source": {
+        "start": 0.0,
+        "end": 3.0
+      }
+    },
+    {
+      "id": "captiongroup_001",
+      "type": "caption_group",
+      "track": "T1",
+      "start": 0.5,
+      "duration": 2.0,
+      "template": "highlight_yellow",
+      "caption_style": "highlight_current",
+      "content": {
+        "words": [
+          {
+            "text": "THIS",
+            "start": 0.5,
+            "end": 0.881
+          },
+          {
+            "text": "IS",
+            "start": 0.881,
+            "end": 1.071
+          },
+          {
+            "text": "ABSOLUTELY",
+            "start": 1.071,
+            "end": 2.024
+          },
+          {
+            "text": "CRAZY",
+            "start": 2.024,
+            "end": 2.5
+          }
+        ]
+      },
+      "style": {
+        "fontFamily": "Arial",
+        "fontSize": 64,
+        "fontWeight": 800,
+        "color": "#FFFFFF",
+        "align": "center",
+        "stroke": {
+          "width": 6,
+          "color": "#000000"
+        }
+      },
+      "highlight": {
+        "color": "#FFE347",
+        "backgroundColor": "",
+        "scale": 1.18
+      },
+      "transform": {
+        "y": 0.82
+      }
+    }
+  ]
+}

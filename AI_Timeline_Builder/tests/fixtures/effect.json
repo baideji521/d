@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "程序特效",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 3.0
+  },
+  "tracks": [
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 3.0,
+      "source": {
+        "start": 0.0,
+        "end": 3.0
+      }
+    },
+    {
+      "id": "effect_001",
+      "type": "effect",
+      "track": "V1",
+      "name": "zoom",
+      "start": 0.5,
+      "duration": 0.8,
+      "easing": "easeInOut",
+      "params": {
+        "scale_from": 1.0,
+        "scale_to": 1.4
+      },
+      "target": "clip_001"
+    },
+    {
+      "id": "effect_002",
+      "type": "effect",
+      "track": "V1",
+      "name": "shake",
+      "start": 1.6,
+      "duration": 0.5,
+      "easing": "easeInOut",
+      "params": {
+        "amplitude": 0.05,
+        "frequency": 20
+      },
+      "target": "clip_001"
+    }
+  ]
+}

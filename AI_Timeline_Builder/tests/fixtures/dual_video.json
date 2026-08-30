@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "双视频顺接",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 4.0
+  },
+  "tracks": [
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 2.0,
+      "source": {
+        "start": 0.0,
+        "end": 2.0
+      }
+    },
+    {
+      "id": "clip_002",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo1",
+      "start": 2.0,
+      "duration": 2.0,
+      "source": {
+        "start": 0.0,
+        "end": 2.0
+      }
+    }
+  ]
+}

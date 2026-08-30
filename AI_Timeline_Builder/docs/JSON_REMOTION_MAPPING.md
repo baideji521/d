@@ -30,6 +30,9 @@ Exporter 一列全部是 `render/remotion_exporter.py:RemotionExporter.export()`
 | `meta.width` | `empty_timeline()` | `Root.tsx:21,32` | `<Composition width>` |
 | `meta.height` | `empty_timeline()` | `Root.tsx:22,33` | `<Composition height>` |
 | `meta.background` | `empty_timeline()` | `TimelineVideo.tsx:136` | 根 `<AbsoluteFill style.backgroundColor>` |
+| `meta.master_volume` | `core/timeline.py:143 DEFAULT_MASTER_VOLUME` | `lib/timeline.ts masterVolume()` | 与元素音量相乘，只影响导出 |
+| `meta.markers` | `core/markers.py` | — | 仅 GUI 标记，不影响渲染 |
+| `meta.safe_area.preset` | `core/safe_area.py` | — | **Remotion 不读它**：只画预览参考框、只喂 `RULE_SAFE_AREA_001`，画面不变 |
 | （派生总时长） | `core/timeline.py:445 timeline_duration()` | `TimelineVideo.tsx:190 timelineDurationInFrames()` | `<Composition durationInFrames>` + `calculateMetadata` |
 
 ## 2. tracks
@@ -56,6 +59,13 @@ element.type
   → 原样透传
   → TimelineVideo.tsx:68 ElementRenderer 的 switch
   → 决定用哪个 Layer 组件
+
+element.safe_area                （可选，布尔）
+  → core/safe_area.py element_locked()
+  → **不传给 Remotion**
+  → 语义是「这个元素声明自己要待在安全区里」，
+    由 RULE_SAFE_AREA_001 校验、由预览画框，画面不变
+
 
 element.start                    ← Timeline Time（成片时间）
   → core/timeline.py 各 make_* 的 start

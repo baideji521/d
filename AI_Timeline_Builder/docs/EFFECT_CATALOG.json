@@ -1,0 +1,1139 @@
+{
+  "version": 1,
+  "effects": [
+    {
+      "name": "zoom",
+      "label": "Zoom 推拉",
+      "kind": "program",
+      "display_category": "运动",
+      "default_duration": 0.6,
+      "description": "以指定中心点缩放画面，最常用的高光强调手法",
+      "params": [
+        {
+          "key": "scale_from",
+          "label": "起始 Scale",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 5.0,
+          "step": 0.01
+        },
+        {
+          "key": "scale_to",
+          "label": "结束 Scale",
+          "type": "number",
+          "default": 1.35,
+          "min": 0.1,
+          "max": 5.0,
+          "step": 0.01
+        },
+        {
+          "key": "origin_x",
+          "label": "中心 X",
+          "type": "number",
+          "default": 0.5,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.01
+        },
+        {
+          "key": "origin_y",
+          "label": "中心 Y",
+          "type": "number",
+          "default": 0.45,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.01
+        }
+      ],
+      "category": "geometry",
+      "renderer": "zoom",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "shake",
+      "label": "Shake 抖动",
+      "kind": "program",
+      "display_category": "运动",
+      "default_duration": 0.4,
+      "description": "按频率随机位移画面，制造冲击感",
+      "params": [
+        {
+          "key": "amplitude",
+          "label": "幅度（画面比例）",
+          "type": "number",
+          "default": 0.02,
+          "min": 0.0,
+          "max": 0.3,
+          "step": 0.005
+        },
+        {
+          "key": "frequency",
+          "label": "频率（次/秒）",
+          "type": "number",
+          "default": 18.0,
+          "min": 1.0,
+          "max": 60.0,
+          "step": 1.0
+        },
+        {
+          "key": "rotation",
+          "label": "附带旋转（度）",
+          "type": "number",
+          "default": 1.5,
+          "min": 0.0,
+          "max": 30.0,
+          "step": 0.5
+        }
+      ],
+      "category": "geometry",
+      "renderer": "shake",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "flash",
+      "label": "Flash 闪白",
+      "kind": "program",
+      "display_category": "光效",
+      "default_duration": 0.2,
+      "description": "叠加一层纯色并快速衰减，常配合 Impact 音效",
+      "params": [
+        {
+          "key": "color",
+          "label": "颜色",
+          "type": "color",
+          "default": "#FFFFFF"
+        },
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.85,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "decay",
+          "label": "衰减曲线",
+          "type": "enum",
+          "default": "easeOut",
+          "options": [
+            "linear",
+            "easeIn",
+            "easeOut",
+            "easeInOut"
+          ]
+        }
+      ],
+      "category": "screen",
+      "renderer": "flash",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "screen"
+    },
+    {
+      "name": "blur",
+      "label": "Blur 模糊",
+      "kind": "program",
+      "display_category": "画质",
+      "default_duration": 0.5,
+      "description": "高斯模糊，从 from 值过渡到 to 值",
+      "params": [
+        {
+          "key": "radius_from",
+          "label": "起始半径 px",
+          "type": "number",
+          "default": 0.0,
+          "min": 0.0,
+          "max": 80.0,
+          "step": 1.0
+        },
+        {
+          "key": "radius_to",
+          "label": "结束半径 px",
+          "type": "number",
+          "default": 12.0,
+          "min": 0.0,
+          "max": 80.0,
+          "step": 1.0
+        }
+      ],
+      "category": "visual",
+      "renderer": "blur",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "glitch",
+      "label": "Glitch 故障",
+      "kind": "program",
+      "display_category": "风格",
+      "default_duration": 0.35,
+      "description": "横向条带错位 + 颜色抖动",
+      "params": [
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.6,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "slices",
+          "label": "条带数量",
+          "type": "int",
+          "default": 12,
+          "min": 2,
+          "max": 60,
+          "step": 1
+        },
+        {
+          "key": "color_shift",
+          "label": "颜色偏移 px",
+          "type": "number",
+          "default": 6.0,
+          "min": 0.0,
+          "max": 40.0,
+          "step": 1.0
+        }
+      ],
+      "category": "screen",
+      "renderer": "glitch",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "screen"
+    },
+    {
+      "name": "rgb_split",
+      "label": "RGB Split 色差",
+      "kind": "program",
+      "display_category": "风格",
+      "default_duration": 0.3,
+      "description": "红蓝通道错开，制造强烈的冲击感",
+      "params": [
+        {
+          "key": "offset",
+          "label": "偏移 px",
+          "type": "number",
+          "default": 8.0,
+          "min": 0.0,
+          "max": 60.0,
+          "step": 1.0
+        },
+        {
+          "key": "angle",
+          "label": "偏移角度",
+          "type": "number",
+          "default": 0.0,
+          "min": 0.0,
+          "max": 360.0,
+          "step": 5.0
+        }
+      ],
+      "category": "screen",
+      "renderer": "rgb_split",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "screen"
+    },
+    {
+      "name": "brightness",
+      "label": "Brightness 亮度",
+      "kind": "program",
+      "display_category": "调色",
+      "default_duration": 0.5,
+      "description": "1.0 为原始亮度",
+      "params": [
+        {
+          "key": "value_from",
+          "label": "起始值",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        },
+        {
+          "key": "value_to",
+          "label": "结束值",
+          "type": "number",
+          "default": 1.4,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        }
+      ],
+      "category": "visual",
+      "renderer": "brightness",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "contrast",
+      "label": "Contrast 对比度",
+      "kind": "program",
+      "display_category": "调色",
+      "default_duration": 0.5,
+      "description": "1.0 为原始对比度",
+      "params": [
+        {
+          "key": "value_from",
+          "label": "起始值",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        },
+        {
+          "key": "value_to",
+          "label": "结束值",
+          "type": "number",
+          "default": 1.3,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        }
+      ],
+      "category": "visual",
+      "renderer": "contrast",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "saturation",
+      "label": "Saturation 饱和度",
+      "kind": "program",
+      "display_category": "调色",
+      "default_duration": 0.5,
+      "description": "0 为黑白，1.0 为原始饱和度",
+      "params": [
+        {
+          "key": "value_from",
+          "label": "起始值",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        },
+        {
+          "key": "value_to",
+          "label": "结束值",
+          "type": "number",
+          "default": 1.6,
+          "min": 0.0,
+          "max": 3.0,
+          "step": 0.05
+        }
+      ],
+      "category": "visual",
+      "renderer": "saturation",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "vignette",
+      "label": "Vignette 暗角",
+      "kind": "program",
+      "display_category": "光效",
+      "default_duration": 1.0,
+      "description": "四周压暗，把注意力收到中心",
+      "params": [
+        {
+          "key": "intensity",
+          "label": "强度",
+          "type": "number",
+          "default": 0.5,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "radius",
+          "label": "半径比例",
+          "type": "number",
+          "default": 0.75,
+          "min": 0.1,
+          "max": 1.5,
+          "step": 0.05
+        }
+      ],
+      "category": "screen",
+      "renderer": "vignette",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "screen"
+    },
+    {
+      "name": "motion_blur",
+      "label": "Motion Blur 运动模糊",
+      "kind": "program",
+      "display_category": "画质",
+      "default_duration": 0.3,
+      "description": "沿指定方向拉伸模糊",
+      "params": [
+        {
+          "key": "amount",
+          "label": "强度 px",
+          "type": "number",
+          "default": 14.0,
+          "min": 0.0,
+          "max": 100.0,
+          "step": 1.0
+        },
+        {
+          "key": "angle",
+          "label": "方向角度",
+          "type": "number",
+          "default": 0.0,
+          "min": 0.0,
+          "max": 360.0,
+          "step": 5.0
+        }
+      ],
+      "category": "visual",
+      "renderer": "motion_blur",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "spin",
+      "label": "Spin 旋转",
+      "kind": "program",
+      "display_category": "运动",
+      "default_duration": 0.5,
+      "description": "画面整体旋转",
+      "params": [
+        {
+          "key": "from",
+          "label": "起始角度",
+          "type": "number",
+          "default": 0.0,
+          "min": -720.0,
+          "max": 720.0,
+          "step": 5.0
+        },
+        {
+          "key": "to",
+          "label": "结束角度",
+          "type": "number",
+          "default": 15.0,
+          "min": -720.0,
+          "max": 720.0,
+          "step": 5.0
+        }
+      ],
+      "category": "geometry",
+      "renderer": "spin",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "bounce",
+      "label": "Bounce 弹跳",
+      "kind": "program",
+      "display_category": "运动",
+      "default_duration": 0.5,
+      "description": "垂直方向弹跳衰减",
+      "params": [
+        {
+          "key": "height",
+          "label": "弹跳高度（画面比例）",
+          "type": "number",
+          "default": 0.08,
+          "min": 0.0,
+          "max": 0.5,
+          "step": 0.01
+        },
+        {
+          "key": "bounces",
+          "label": "弹跳次数",
+          "type": "int",
+          "default": 2,
+          "min": 1,
+          "max": 8,
+          "step": 1
+        }
+      ],
+      "category": "geometry",
+      "renderer": "bounce",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "pulse",
+      "label": "Pulse 呼吸",
+      "kind": "program",
+      "display_category": "运动",
+      "default_duration": 0.8,
+      "description": "周期性缩放，适合持续强调",
+      "params": [
+        {
+          "key": "scale_min",
+          "label": "最小 Scale",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 3.0,
+          "step": 0.01
+        },
+        {
+          "key": "scale_max",
+          "label": "最大 Scale",
+          "type": "number",
+          "default": 1.08,
+          "min": 0.1,
+          "max": 3.0,
+          "step": 0.01
+        },
+        {
+          "key": "cycles",
+          "label": "周期数",
+          "type": "int",
+          "default": 2,
+          "min": 1,
+          "max": 10,
+          "step": 1
+        }
+      ],
+      "category": "geometry",
+      "renderer": "pulse",
+      "supported_targets": [
+        "video",
+        "freeze",
+        "image",
+        "overlay",
+        "text",
+        "caption",
+        "caption_group"
+      ],
+      "scope": "element"
+    },
+    {
+      "name": "fire",
+      "label": "Fire 火焰",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 1.2,
+      "blend": "screen",
+      "description": "火焰素材叠加，建议放 V3/V4 轨",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "smoke",
+      "label": "Smoke 烟雾",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 1.5,
+      "blend": "screen",
+      "description": "烟雾素材叠加",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "explosion",
+      "label": "Explosion 爆炸",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 0.8,
+      "blend": "screen",
+      "description": "爆炸素材，常配 Impact 音效",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "spark",
+      "label": "Spark 火花",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 0.6,
+      "blend": "screen",
+      "description": "火花粒子",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lightning",
+      "label": "Lightning 闪电",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 0.5,
+      "blend": "screen",
+      "description": "闪电，配合 Flash 效果更强",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "light_leak",
+      "label": "Light Leak 漏光",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 1.0,
+      "blend": "screen",
+      "description": "漏光素材，适合做转场衔接",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "particle",
+      "label": "Particle 粒子",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 1.5,
+      "blend": "screen",
+      "description": "通用粒子素材",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "speed_lines",
+      "label": "Speed Lines 速度线",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 0.5,
+      "blend": "screen",
+      "description": "速度线，强调运动方向",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "glow",
+      "label": "Glow 光晕",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 0.8,
+      "blend": "screen",
+      "description": "光晕素材",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dust",
+      "label": "Dust 灰尘",
+      "kind": "material",
+      "category": "overlay",
+      "display_category": "素材特效",
+      "default_duration": 2.0,
+      "blend": "screen",
+      "description": "空气尘埃，做氛围层",
+      "supported_targets": [],
+      "scope": "asset",
+      "renderer": "",
+      "params": [
+        {
+          "key": "asset",
+          "label": "素材",
+          "type": "asset",
+          "default": "",
+          "asset_type": "overlay",
+          "hint": "从素材库选择叠加素材"
+        },
+        {
+          "key": "scale",
+          "label": "缩放",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.1,
+          "max": 4.0,
+          "step": 0.05
+        },
+        {
+          "key": "opacity",
+          "label": "不透明度",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
+        },
+        {
+          "key": "blend",
+          "label": "混合模式",
+          "type": "enum",
+          "default": "screen",
+          "options": [
+            "normal",
+            "screen",
+            "add"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -28,6 +28,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from core import safe_area as sa
 from core import timeline as tl
 from core.time_utils import format_timecode_long, frame_label
 
@@ -132,10 +133,14 @@ class PreviewCanvas(QWidget):
         painter.end()
 
     def _paint_safe_area(self, painter: QPainter) -> None:
-        """画动作安全区与标题安全区。
+        """画三层参考框：
 
-        比例是相对**画布**的，所以换成 3:4 或 9:16 都自动适配 ——
-        安全区跟着 _target_rect 走，而 _target_rect 由 meta.width/height 算出来。
+        1. 动作安全 93% / 标题安全 90% —— 广播行业惯例，与平台无关；
+        2. **平台安全区** —— 按 `meta.safe_area.preset` 从 core/safe_area.py 取，
+           抖音 / Shorts / Reels 各不相同，四边内缩也不对称
+           （右侧按钮列比左侧宽得多），所以不能用「居中缩放」那种画法。
+
+        比例都是相对**画布**的，所以换成 3:4 / 9:16 / 16:9 / 1:1 都自动适配。
         """
         rect = self._target_rect
         for ratio, color, label in (
@@ -154,6 +159,24 @@ class PreviewCanvas(QWidget):
             painter.setPen(pen)
             painter.drawRect(box)
             painter.drawText(box.left() + 4, box.top() + 14, label)
+
+        # 直接读模型内部 JSON 引用（只读），不走 to_dict()，避免每帧重建稀疏副本
+        preset = sa.timeline_preset(self._model.timeline)
+        left, top, right, bottom = sa.box(preset)
+        platform_box = QRect(
+            rect.left() + int(rect.width() * left),
+            rect.top() + int(rect.height() * top),
+            max(1, int(rect.width() * (right - left))),
+            max(1, int(rect.height() * (bottom - top))),
+        )
+        painter.setPen(QPen(QColor("#f56565"), 2, Qt.DashDotLine))
+        painter.drawRect(platform_box)
+        painter.drawText(
+            platform_box.left() + 4,
+            platform_box.bottom() - 6,
+            f"平台安全区 {sa.label_of(preset)}",
+        )
+
         # 画面中心十字，方便判断元素有没有居中
         painter.setPen(QPen(QColor("#3b4657"), 1, Qt.DotLine))
         painter.drawLine(rect.center().x(), rect.top(), rect.center().x(), rect.bottom())
@@ -224,7 +247,10 @@ class PreviewWidget(QWidget):
         next_button.clicked.connect(lambda: self._step(1))
 
         self._safe_area = QCheckBox("安全区")
-        self._safe_area.setToolTip("显示动作安全区 93% / 标题安全区 90%，按当前画面比例适配")
+        self._safe_area.setToolTip(
+            "显示动作安全区 93% / 标题安全区 90%，以及 meta.safe_area.preset 指定的"
+            "平台安全区（抖音 / YouTube Shorts / Instagram Reels / 通用），按当前画面比例适配"
+        )
         self._safe_area.toggled.connect(self.canvas.set_safe_area_visible)
 
         # 预览没有音频通路（本工程不做音频解码播放），所以这里控制的是

@@ -4,20 +4,24 @@
 
 ## 1. 闸门总表
 
-- `python -m pytest tests/ -q` → **638 passed / 0 failed**（`logs/p8_pytest_final.txt`）
+- `python -m pytest -q` → **807 passed / 0 failed**（`logs/step_pytest_final.txt`）
 - `node --test src/lib/timeline.test.ts src/effects/registry.test.ts src/transitions/registry.test.ts`
-  → **74 tests / 74 pass / 0 fail**（`logs/p8_nodetest.txt`）
-- `node node_modules/typescript/bin/tsc --noEmit` → **0 error**（`logs/p8_tsc.txt`）
-- GUI 冒烟 `python out/acceptance/gui_drag.py`（离屏）→ **10 组用例全 PASS**（`logs/gui_drag.json`）
+  → **74 tests / 74 pass / 0 fail**（`logs/step_nodetest_final.txt`）
+- `node node_modules/typescript/bin/tsc --noEmit` → **0 error**（`logs/step_tsc.txt`）
+- GUI 冒烟 `python out/acceptance/gui_drag.py`（离屏）→ **11 组用例全 PASS**（`logs/gui_drag.json`）
 - DPI 复核 125% / 150% / 175% → 每轮 5 组坐标用例，**三轮全 PASS**
   （`logs/gui_drag_dpi_1_25.json` / `_1_5.json` / `_1_75.json`）
 - GUI 往返 `python out/acceptance/gui_roundtrip.py` → **4 组全 PASS**（`logs/gui_roundtrip.json`）
-- JSON 校验：GUI 产出的 10 份渲染 JSON **validator error 全为空**
-- v1 → v2 迁移：`core/migrations/migration_v1_v2.py` 由 pytest 覆盖，round trip 无损
+- 退出路径 `python out/acceptance/exit_paths.py` → **3 条全 PASS**（`logs/exit_paths.json`）
+- JSON 校验：GUI 产出的 11 份渲染 JSON **validator error 全为空**
+- v1 → v2 迁移：`core/migrations/migration_v1_v2.py` 由 pytest 覆盖，round trip 无损；
+  v2 → v1 降级的丢失项由 `TimelineModel.load()` 写进 `report["downgrade_losses"]` 并打日志
 - 稀疏往返：读进去再导出逐字节一致（`roundtrip_stable = true`），连续存取 ×5 不漂移
 - 特效矩阵：14 个 program effect 全部真实渲染
 - 转场矩阵：11 个转场全部真实渲染（与运行时注册表一一对应）
-- 分辨率矩阵：1080×1440 / 1080×1920 / 810×1080 / 540×960 真实渲染并 ffprobe 核对
+- 分辨率矩阵：1080×1440 / 1080×1920 / 1920×1080 / 1080×1080 / 810×1080 / 540×960
+  真实渲染并 ffprobe 核对（四种比例齐全）
+- 元素夹具矩阵：16 条真实渲染 + 探针 **16/16 OK、非预期黑帧 0**（`logs/fixtures_probe.json`）
 - 真实 MP4 + ffprobe + 音频探针 + 抽帧探针：见 `docs/FINAL_RENDER_MATRIX.md`
 - 特征用例全量：`analyze.py final` → **PASS 155 / FAIL 0**（SKIPPED 11、NOT_IMPLEMENTED 2）
 - 文档漂移检查：`python tools/build_catalog.py --check` 由 `tests/test_catalog.py` 守着
@@ -85,12 +89,38 @@ pytest 与 GUI 用例都看不见。现在这条闸门补上了。
   （video / overlay / audio / caption / caption_group / text / effect / transition），
   跨 7 条轨道（V1 / V2 / V3 / A1 / A3 / T1 / T2），并带一个 `meta.markers` 标记
 
+### 3.1 全流程用例 `gui_full_flow`（本轮新增）
+
+一个用例走完整条链路，全部真实 Qt 事件，最后导出 JSON 并真实渲染：
+
+导入素材 → 裁剪到 2.0s → 追加第二段 → 加转场 → V2 叠加（裁到 1.5s）→ 插图片 →
+铺 BGM → 加音效 → 加特效 → 加字幕 → 加字幕组 → 加文字 → 定格 → 改变换 →
+打关键帧 → 依次切 3:4 / 9:16 / 16:9 / 1:1 → 导出。
+
+自动判定的点（不是"跑通就算过"）：
+
+- 定格取的源时间 = `source.start + (playhead - start) × speed`，逐值核对
+- 变换只写了改过的两个键：`set(written["transform"]) == {"scale", "opacity"}`
+- 关键帧 `scale @0.5 = 1.4` 真的落进 `keyframes`
+- 四个比例切完后 `meta.width/height` 依次为 1080×1440 / 1080×1920 / 1920×1080 / 1080×1080
+- `meta.safe_area == {"preset": "tiktok"}`，重开项目设置对话框后档位不漂
+- 导出 JSON 过 validator，9 类元素齐全
+- **没动过的片段身上不能出现 `transform` / `speed` / `audio` / `keyframes`**（稀疏铁律）
+- 导出再读入再导出，逐字节一致
+- 预览 `grab()` 非空
+
+这个用例第一版渲出了 95.6s / 2868 帧的成片 —— 原因是 V2 叠加段忘了裁剪，
+补上裁剪手势后回到 16.0s / 1080×1080 / 12 个元素。
+这不是"改标准让测试变绿"，是用例本身漏了一步操作。
+
 ## 4. 明确的局限（不当成 PASS）
 
 1. 预览通道**没有音频输出**，播放器上的音量 / 静音只作用于导出
    （`meta.master_volume`），控件文案已如实标注；音量生效由渲染后响度差
    6.0dB（理论 6.02dB）证明，不靠人耳。
-2. 6 个预置分辨率里有 3 个（720×1280 / 1440×1920 / 1440×2560）**没有逐个渲染**，
+2. 预置分辨率共 17 档（3:4 五档、9:16 / 16:9 / 1:1 各四档），**真实渲染过 5 档**
+   （810×1080 / 1080×1440 / 1080×1920 / 1920×1080 / 1080×1080）加一个非预置的
+   540×960 小画布。四种**比例**已全部覆盖，未覆盖的都是同比例下的其它像素档；
    理由与替代验证写在 `docs/FINAL_RENDER_MATRIX.md` 第 4 节。
 3. DPI 只覆盖 125 / 150 / 175%，且用 `QT_SCALE_FACTOR` 模拟，
    不等于真实高分屏物理设备。

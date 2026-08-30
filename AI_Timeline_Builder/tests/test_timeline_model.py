@@ -57,6 +57,27 @@ def test_to_v2_dict_给出_v2_视图(model, timeline):
     assert v2["elements"][0]["timing"] == {"start": 0.0, "duration": 5.0}
 
 
+def test_降级丢分组时报告里必须写明(model, timeline):
+    """v1 没有 group 概念，丢是允许的，静默丢不行（指令第三十三条）。"""
+    from core.migrations import migrate_v1_to_v2
+
+    v2 = migrate_v1_to_v2(timeline)
+    v2["elements"][0]["group"] = "grp_001"
+    report = model.from_dict(v2, "吃带分组的 v2")
+    losses = report.get("downgrade_losses") or []
+    assert [item["field"] for item in losses] == ["group"], \
+        f"降级损失没被报出来：{sorted(report)}"
+    assert losses[0]["element"] == "clip_001"
+
+
+def test_无损降级时不写多余的损失字段(model, timeline):
+    from core.migrations import migrate_v1_to_v2
+
+    report = model.from_dict(migrate_v1_to_v2(timeline), "吃 v2")
+    assert "downgrade_losses" not in report
+
+
+
 # ---------------------------------------------------------------- Video
 
 def test_video_增删改查(model):

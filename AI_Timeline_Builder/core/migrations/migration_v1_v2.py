@@ -76,6 +76,45 @@ def migrate_to_v1(data: Dict[str, Any]) -> Dict[str, Any]:
     return migrate_v2_to_v1(data)
 
 
+def downgrade_losses(data: Dict[str, Any]) -> List[Dict[str, str]]:
+    """v2 → v1 会丢掉哪些信息（指令第三十三条：禁止静默数据损失）。
+
+    v1 没有 group / children 概念，所以 v2 的分组关系在降级时无处安放。
+    这个函数**不修改输入**，只如实列出将要丢失的字段，让 GUI / 导出器
+    可以先给用户一个明确警告，而不是悄悄把分组吃掉。
+
+    返回 [{element, type, field, message}, ...]，空列表 = 无损。
+    """
+    if detect_version(data) <= 1:
+        return []
+    losses: List[Dict[str, str]] = []
+    for element in data.get("elements", []):
+        if not isinstance(element, dict):
+            continue
+        element_id = str(element.get("id", ""))
+        type_name = str(element.get("type", ""))
+        if element.get("group"):
+            losses.append(
+                {
+                    "element": element_id,
+                    "type": type_name,
+                    "field": "group",
+                    "message": f"元素属于分组 {element['group']}，v1 无法表达分组归属，降级后会丢失",
+                }
+            )
+        if type_name == "group":
+            children = element.get("children") or []
+            losses.append(
+                {
+                    "element": element_id,
+                    "type": type_name,
+                    "field": "children",
+                    "message": f"group 元素含 {len(children)} 个成员，v1 没有 group 类型，降级后整组关系会丢失",
+                }
+            )
+    return losses
+
+
 # ------------------------------------------------------------------ v1 → v2
 
 
@@ -179,7 +218,8 @@ def _element_to_v1(source_element: Dict[str, Any]) -> Dict[str, Any]:
     elif type_name == "transition":
         _spread(element, element.pop("transition", None), _TRANSITION_KEYS)
 
-    # v1 没有 group / children 概念，丢掉前先不静默：group 成员关系在 v1 里无处安放
+    # v1 没有 group / children 概念。这里确实会丢信息，
+    # 所以配了 downgrade_losses() 让调用方能先拿到明确警告 —— 丢可以，静默不行。
     element.pop("group", None)
     if type_name == "group":
         element.pop("children", None)

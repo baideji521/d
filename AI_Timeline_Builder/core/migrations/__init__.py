@@ -18,6 +18,7 @@ from __future__ import annotations
 from core.migrations.migration_v1_v2 import (
     LATEST_VERSION,
     detect_version,
+    downgrade_losses,
     migrate_to_v1,
     migrate_to_v2,
     migrate_v1_to_v2,
@@ -27,6 +28,7 @@ from core.migrations.migration_v1_v2 import (
 __all__ = [
     "LATEST_VERSION",
     "detect_version",
+    "downgrade_losses",
     "migrate_to_v1",
     "migrate_to_v2",
     "migrate_v1_to_v2",

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "time_unit": "seconds",
+  "meta": {
+    "name": "冻结帧",
+    "fps": 30.0,
+    "width": 540,
+    "height": 960,
+    "duration": 3.0
+  },
+  "tracks": [
+    {
+      "id": "V1",
+      "name": "V1 主视频",
+      "kind": "video"
+    }
+  ],
+  "elements": [
+    {
+      "id": "clip_001",
+      "type": "video",
+      "track": "V1",
+      "asset": "demo",
+      "start": 0.0,
+      "duration": 2.0,
+      "source": {
+        "start": 0.0,
+        "end": 2.0
+      }
+    },
+    {
+      "id": "freeze_001",
+      "type": "freeze",
+      "track": "V1",
+      "target": "clip_001",
+      "source_time": 1.5,
+      "start": 2.0,
+      "duration": 1.0
+    }
+  ]
+}

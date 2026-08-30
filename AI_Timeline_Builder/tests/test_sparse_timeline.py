@@ -491,7 +491,34 @@ def test_json_面板文本就是稀疏_JSON(model):
     assert '"keyframes"' not in text
 
 
+# ---------------------------------------------------------------- 安全区档位
+
+
+def test_安全区通用档不落盘(model):
+    """通用档就是默认值，写进 JSON 等于凭空多一个字段。"""
+    model.add_element(_clip())
+    model.set_meta("safe_area", {"preset": "generic"})
+    assert "safe_area" not in model.to_dict()["meta"]
+
+
+def test_安全区平台档要落盘并且能改回默认(model):
+    model.add_element(_clip())
+    model.set_meta("safe_area", {"preset": "tiktok"})
+    assert model.to_dict()["meta"]["safe_area"] == {"preset": "tiktok"}
+    # 改回通用 = 恢复默认 → 字段必须再消失（稀疏规则第三条）
+    model.set_meta("safe_area", {"preset": "generic"})
+    assert "safe_area" not in model.to_dict()["meta"]
+
+
+def test_安全区带额外键时整体保留(model):
+    """只有「纯默认档位」才省。多写了别的键说明用户另有意图，不能删。"""
+    model.add_element(_clip())
+    model.set_meta("safe_area", {"preset": "generic", "note": "自己量的"})
+    assert model.to_dict()["meta"]["safe_area"]["note"] == "自己量的"
+
+
 # ---------------------------------------------------------------- 面板只读
+
 
 
 def test_属性面板源码里不允许对元素_setdefault():
