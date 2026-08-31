@@ -106,7 +106,7 @@ class RuleEngine:
     """
 
     #: 本模块负责实现的规则 id
-    RULES_IMPLEMENTED_HERE = ("RULE_CLIP_001", "RULE_SAFE_AREA_001")
+    RULES_IMPLEMENTED_HERE = ("RULE_CLIP_001", "RULE_SAFE_AREA_001", "RULE_SAFE_AREA_002")
 
     def __init__(self, definitions: Optional[Dict[str, RuleDefinition]] = None) -> None:
         self._definitions = dict(definitions or {})
@@ -132,6 +132,7 @@ class RuleEngine:
         findings: List[Finding] = []
         findings.extend(self._check_clip_length(timeline))
         findings.extend(self._check_safe_area(timeline))
+        findings.extend(self._check_safe_area_layout(timeline))
         return findings
 
     # ------------------------------------------------------------ 各族规则
@@ -213,6 +214,37 @@ class RuleEngine:
                     f"（{sa.label_of(preset)}：x ∈ [{left:.2f}, {right:.2f}]，"
                     f"y ∈ [{top:.2f}, {bottom:.2f}]）",
                     str(element.get("id", "")),
+                    ["transform"],
+                )
+            )
+        return findings
+
+    def _check_safe_area_layout(self, timeline: Dict[str, Any]) -> List[Finding]:
+        """RULE_SAFE_AREA_002：字幕 / 文字 / 叠加素材越界，即使没声明也提示。
+
+        为什么要有这一条（指令第二十一条）：只查 `safe_area: true` 的元素，
+        安全区就只是个自愿贴的标签 —— 大多数人根本不会贴，字幕照样被 UI 压住。
+        排版约束该对所有排版元素生效。
+
+        但它只报 warning，不拦渲染：满屏贴纸、故意压边的花字都是正当做法，
+        工具的职责是「提醒你这里会被 UI 盖住」，不是替你决定构图。
+        已经声明 `safe_area: true` 的元素由 001 以 error 报，这里跳过，不重复。
+        """
+        findings: List[Finding] = []
+        for row in sa.violations(timeline):
+            if row["locked"]:
+                continue  # 归 RULE_SAFE_AREA_001，那边是 error
+            bounds = row["box"]
+            findings.append(
+                Finding(
+                    "RULE_SAFE_AREA_002",
+                    f"{tl.ELEMENT_TYPE_LABELS.get(row['type'], row['type'])}"
+                    f"位置 ({row['x']:.3f}, {row['y']:.3f}) 在安全区外，"
+                    f"发布后可能被平台 UI 压住"
+                    f"（{sa.label_of(row['preset'])}："
+                    f"x ∈ [{bounds['left']:.2f}, {bounds['right']:.2f}]，"
+                    f"y ∈ [{bounds['top']:.2f}, {bounds['bottom']:.2f}]）",
+                    row["id"],
                     ["transform"],
                 )
             )

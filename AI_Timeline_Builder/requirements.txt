@@ -10,3 +10,8 @@
 PyQt5==5.15.11
 jsonschema==4.23.0
 pytest==8.3.4
+
+# 可选：Edge 神经网络语音（core/voice.py 的 EdgeVoiceProvider）
+# 不装也能跑 —— 配音会退回 Windows 自带 SAPI（只有一个英文女声，听感机械）。
+# 装了并且能联网时 core.voice.best_provider() 会优先选它。
+edge-tts==7.2.8

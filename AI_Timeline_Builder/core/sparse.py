@@ -267,10 +267,19 @@ def _sparse_meta(meta: Dict[str, Any]) -> Dict[str, Any]:
         del result["markers"]
     # 安全区档位：通用档就是默认值，写进 JSON 等于凭空多一个字段。
     # 用户改成抖音 / Shorts / Reels 才落盘，改回通用要再删掉。
+    # version / source 是数值出处的注记（指令第二十三条），本身不是用户意图：
+    # 只带这两个注记的通用档照样算默认值，一起删；换了档位才连注记一起落盘。
     safe = result.get("safe_area")
     if isinstance(safe, dict):
-        if not safe or (list(safe) == ["preset"]
-                        and _same(safe.get("preset"), sa.DEFAULT_PRESET_ID)):
+        annotations = {"version": sa.PRESET_VERSION, "source": sa.PRESET_SOURCE}
+        extra = set(safe) - {"preset"}
+        only_annotations = extra <= set(annotations) and all(
+            _same(safe[key], annotations[key]) for key in extra
+        )
+        if not safe or (
+            only_annotations and _same(safe.get("preset", sa.DEFAULT_PRESET_ID),
+                                       sa.DEFAULT_PRESET_ID)
+        ):
             del result["safe_area"]
     return result
 

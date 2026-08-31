@@ -175,7 +175,27 @@ def _coverage_lines(names: List[str], runtime: Optional[List[str]], note: str,
 # ---------------------------------------------------------------- Effect
 
 
-def build_effect_catalog(effects, runtime: Optional[Dict[str, Any]], note: str) -> str:
+def _material_assets(registry: AssetRegistry, name: str) -> List[str]:
+    """素材特效靠 overlay 元素 + 一个真实素材文件落地。
+    按 asset id 去空格下划线后包含特效名来匹配（`ov_lightleak` ↔ `light_leak`），
+    只认 id、不拿文件名模糊匹配 —— 否则 `dust_sparkle` 会被 `spark` 抢走。
+    盘上找不到文件的素材不算可用。"""
+    token = name.replace("_", "").lower()
+    hits = []
+    for asset in registry.all():
+        path = str(asset.get("path", ""))
+        if not path.startswith(("assets/transitions", "assets/overlays")):
+            continue
+        if token not in str(asset.get("id", "")).replace("_", "").lower():
+            continue
+        full = os.path.join(ROOT, path.replace("/", os.sep))
+        if os.path.isfile(full):
+            hits.append(str(asset.get("id", "")))
+    return sorted(hits)
+
+
+def build_effect_catalog(effects, runtime: Optional[Dict[str, Any]], note: str,
+                         registry: AssetRegistry) -> str:
     items = sorted(effects.all(), key=lambda d: (d.category, d.name))
     runtime_names = None
     if runtime is not None:
@@ -203,31 +223,50 @@ def build_effect_catalog(effects, runtime: Optional[Dict[str, Any]], note: str) 
         runtime_names, note, "program 特效",
     )
 
-    lines += ["## 一览", "", "| name | 中文名 | 分类 | kind | renderer | 默认时长 |",
-              "| --- | --- | --- | --- | --- | --- |"]
+    lines += ["## 一览", "",
+              "| name | 中文名 | 分类 | kind | renderer | 默认时长 | 素材可用性 |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
     for item in items:
+        kind = str(item.get("kind", "program"))
+        if kind == "program":
+            availability = "不需要素材（程序渲染）"
+        else:
+            hits = _material_assets(registry, item.name)
+            availability = ("AVAILABLE：" + "、".join(f"`{i}`" for i in hits)) if hits \
+                else "MISSING：素材库里没有对应文件，放上去之前渲染不出东西"
         lines.append(
             f'| `{item.name}` | {item.display_name} | {item.display_category}'
-            f'（{item.category}） | `{item.get("kind","program")}` | `{item.renderer or "—"}` '
-            f'| {item.default_duration:g}s |'
+            f'（{item.category}） | `{kind}` | `{item.renderer or "—"}` '
+            f'| {item.default_duration:g}s | {availability} |'
         )
     lines.append("")
 
     lines += ["## 逐个说明", ""]
     for item in items:
+        kind = str(item.get("kind", "program"))
         lines += [
             f"### `{item.name}` · {item.display_name}",
             "",
             f"- 分类：{item.display_category}（`{item.category}`）",
-            f'- kind：`{item.get("kind","program")}`　scope：`{item.get("scope","element")}`',
+            f'- kind：`{kind}`　scope：`{item.get("scope","element")}`',
             f'- renderer：`{item.renderer or "—"}`',
             f"- 默认时长：{item.default_duration:g}s",
             f'- 可作用元素：{"、".join(f"`{t}`" for t in item.get("supported_targets", [])) or "—"}',
             f"- 说明：{item.description or '—'}",
-            "",
         ]
+        if kind != "program":
+            hits = _material_assets(registry, item.name)
+            lines.append(
+                "- 素材可用性：" + ("AVAILABLE —— " + "、".join(f"`{i}`" for i in hits)
+                                if hits else
+                                "**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / "
+                                "`assets/transitions` 里没有对应素材文件；"
+                                "在导入素材之前它渲染不出任何画面")
+            )
+        lines.append("")
         lines += _param_table([dict(p) for p in item.get("params", [])])
     return "\n".join(lines).rstrip() + "\n"
+
 
 
 # ---------------------------------------------------------------- Transition
@@ -898,14 +937,26 @@ def build_ai_capabilities(
             "note": "AI 只能表达这些动作；未列出的动作会被 Planner 报 UNKNOWN_ACTION",
             "whitelist": list(ACTIONS),
             "detail": action_catalog(),
+            "schema": "schemas/editing_decision_schema.json",
+            "contract": (
+                "AI 的输出**只能**是 EditingDecision 列表（{\"decisions\": [...]}），"
+                "不是 Timeline JSON，不是 TSX，也不是 ffmpeg 命令行。"
+                "Timeline JSON 由 EditingPlanner 生成，由 TimelineValidator 判定"
+            ),
             "decision_shape": {
                 "action": "zoom",
                 "target": "clip_003",
                 "start": 12.4,
                 "duration": 0.6,
-                "params": {"scale_to": 1.2},
+                "parameters": {"scale_to": 1.2},
                 "reason": "强调反应瞬间",
+                "confidence": 0.8,
             },
+            "runtime_ignores": ["reason", "confidence", "decision_id"],
+            "provenance": (
+                "reason / confidence / 输入引用写进 decisions.json（core/provenance.py），"
+                "不进 timeline.json —— 删掉它渲染结果一模一样"
+            ),
         },
         "rules": {
             "note": "校验规则全表。level=error 会阻止导出，warning 只提示",
@@ -916,11 +967,18 @@ def build_ai_capabilities(
         },
         "safe_area": {
             "note": (
-                "元素写 safe_area: true 才受约束；内缩比例是各平台界面的实测估算值，"
-                "不是平台官方规范，只用于提示与自动收位，不改渲染结果"
+                "安全区是**排版约束**：字幕 / 文字 / 叠加素材越界会被 RULE_SAFE_AREA_002 "
+                "提示（warning），显式写 safe_area: true 的元素越界是 RULE_SAFE_AREA_001 "
+                "（error）。内缩比例是各平台界面的实测估算值，不是平台官方规范；"
+                "Remotion 不读它，既不会画出安全框，也不会在渲染时偷偷挪位置 —— "
+                "要收位就显式调 clamp_to_safe_area()，结果写回 transform"
             ),
-            "location": "meta.safe_area.preset",
+            "location": "meta.safe_area",
             "default": safe.DEFAULT_PRESET_ID,
+            "version": safe.PRESET_VERSION,
+            "source": safe.PRESET_SOURCE,
+            "constrained_types": list(safe.CONSTRAINED_TYPES),
+            "meta_shape": safe.preset_meta("tiktok"),
             "presets": safe.catalog(),
         },
         "voice": {
@@ -1017,6 +1075,9 @@ def build_ai_capabilities_md(payload: Dict[str, Any]) -> str:
         )
 
     lines += ["", "## 安全区", "", payload["safe_area"]["note"], "",
+              f"数值版本 v{payload['safe_area']['version']}"
+              f"（来源：{payload['safe_area']['source']} / 实测估算）。"
+              f"受约束的元素类型：{', '.join(payload['safe_area']['constrained_types'])}。", "",
               "| 档位 | 说明 | x 范围 | y 范围 |", "| --- | --- | --- | --- |"]
     for preset in payload["safe_area"]["presets"]:
         box = preset["box"]
@@ -1146,7 +1207,7 @@ def build_all() -> Dict[str, str]:
     sfx = build_sfx_catalog_json(registry)
     capabilities = build_ai_capabilities(catalog, effects, transitions, registry, sfx)
     return {
-        "EFFECT_CATALOG.md": build_effect_catalog(effects, runtime, note),
+        "EFFECT_CATALOG.md": build_effect_catalog(effects, runtime, note, registry),
         "TRANSITION_CATALOG.md": build_transition_catalog(transitions, runtime, note),
         "SOUND_EFFECT_CATALOG.md": build_sound_catalog(sounds),
         "RESOLUTION_GUIDE.md": build_resolution_guide(),

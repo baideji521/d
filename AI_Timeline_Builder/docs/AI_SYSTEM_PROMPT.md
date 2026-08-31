@@ -20,10 +20,11 @@
       "target": "clip_003",
       "start": 12.4,
       "duration": 0.6,
-      "params": {
+      "parameters": {
         "scale_to": 1.2
       },
-      "reason": "强调反应瞬间"
+      "reason": "强调反应瞬间",
+      "confidence": 0.8
     },
     {
       "action": "highlight",

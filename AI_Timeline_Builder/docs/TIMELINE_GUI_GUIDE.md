@@ -63,6 +63,8 @@ v1 / v2 schema 都显式允许。类型：
 | `caption` | 字幕 |
 | `sfx` | 音效 |
 | `ai_highlight` | AI 精彩点 |
+| `voice_peak` | 配音重音 |
+| `voice_pause` | 配音停顿 |
 
 ## 快捷键
 

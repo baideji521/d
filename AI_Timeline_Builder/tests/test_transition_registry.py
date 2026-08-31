@@ -561,15 +561,30 @@ def test_既有_JSON_形状仍被接受(registry: TransitionLibrary) -> None:
 
 
 def test_真实_timeline_json_里的转场全部已注册(registry: TransitionLibrary) -> None:
-    """指令第二十四条：既有 14 元素 Demo 必须继续过。"""
-    path = os.path.join(ROOT, "remotion", "timeline.json")
-    if not os.path.exists(path):
-        pytest.skip("remotion/timeline.json 不存在")
-    with open(path, "r", encoding="utf-8") as handle:
+    """指令第二十四条：既有综合 Demo 必须继续过。
+
+    盯的是 `tests/fixtures/demo_timeline.json` —— 它由 `tools/build_fixtures.py`
+    生成、进版本库、由 `tests/test_fixtures.py` 守着，是 Demo 的**权威副本**。
+    `remotion/timeline.json` 只是「最后一次导出」的产物（导一次就被覆盖一次），
+    所以它只被要求「里面出现的转场必须都已注册」，不要求它一定含转场。
+    """
+    fixture = os.path.join(ROOT, "tests", "fixtures", "demo_timeline.json")
+    assert os.path.isfile(fixture), "Demo 权威副本没了，先跑 tools/build_fixtures.py build"
+    with open(fixture, "r", encoding="utf-8") as handle:
         data = json.load(handle)
     transitions = [e for e in data.get("elements", []) if e.get("type") == "transition"]
     assert transitions, "Demo 里应当至少有一个转场"
-    by_id = {e.get("id"): e for e in data.get("elements", [])}
+
+    exported = os.path.join(ROOT, "remotion", "timeline.json")
+    if os.path.isfile(exported):
+        with open(exported, "r", encoding="utf-8") as handle:
+            live = json.load(handle)
+        transitions += [e for e in live.get("elements", []) if e.get("type") == "transition"]
+        elements = list(data.get("elements", [])) + list(live.get("elements", []))
+    else:
+        elements = list(data.get("elements", []))
+
+    by_id = {e.get("id"): e for e in elements}
     for element in transitions:
         assert registry.has(element.get("name")), element
         assert registry.validate(element["name"], element.get("params"))["valid"] is True
@@ -582,13 +597,20 @@ def test_真实_timeline_json_里的转场全部已注册(registry: TransitionLi
 
 
 def test_真实_Demo_过_Validator_没有转场错误(validator) -> None:
-    path = os.path.join(ROOT, "remotion", "timeline.json")
-    if not os.path.exists(path):
-        pytest.skip("remotion/timeline.json 不存在")
-    with open(path, "r", encoding="utf-8") as handle:
-        data = json.load(handle)
-    issues = validator.validate(data)
-    assert [i for i in issues if i.rule_id.startswith("RULE_TRANSITION") and i.is_error()] == []
+    """Demo 权威副本 + 最后一次导出的产物，都不许有转场级 error。"""
+    paths = [os.path.join(ROOT, "tests", "fixtures", "demo_timeline.json"),
+             os.path.join(ROOT, "remotion", "timeline.json")]
+    checked = 0
+    for path in paths:
+        if not os.path.isfile(path):
+            continue
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        issues = validator.validate(data)
+        assert [i for i in issues
+                if i.rule_id.startswith("RULE_TRANSITION") and i.is_error()] == [], path
+        checked += 1
+    assert checked, "两份 Demo JSON 都不在，验收无从谈起"
 
 
 def test_export_definitions_是纯_JSON(registry: TransitionLibrary) -> None:

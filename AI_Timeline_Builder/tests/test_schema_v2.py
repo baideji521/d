@@ -127,14 +127,23 @@ def test_v1_迁到_v2_后能通过_v2_schema(rich_v1, v2_validator):
 
 
 def test_真实_Demo_迁到_v2_也能通过(v2_validator):
-    """用磁盘上真实存在的导出结果，而不是测试里造的数据。"""
-    path = os.path.join(ROOT, "remotion", "timeline.json")
-    if not os.path.isfile(path):
-        pytest.skip("remotion/timeline.json 不存在，跳过")
-    with open(path, "r", encoding="utf-8") as handle:
-        exported = json.load(handle)
-    upgraded = migrate_to_v2(exported)
-    assert errors_of(v2_validator, upgraded) == []
+    """用磁盘上真实存在的 Demo，而不是测试里造的数据。
+
+    权威副本是 `tests/fixtures/demo_timeline.json`（进版本库、有生成器守着）；
+    `remotion/timeline.json` 是最后一次导出的产物，存在就一起验。
+    """
+    paths = [os.path.join(ROOT, "tests", "fixtures", "demo_timeline.json"),
+             os.path.join(ROOT, "remotion", "timeline.json")]
+    checked = 0
+    for path in paths:
+        if not os.path.isfile(path):
+            continue
+        with open(path, "r", encoding="utf-8") as handle:
+            exported = json.load(handle)
+        upgraded = migrate_to_v2(exported)
+        assert errors_of(v2_validator, upgraded) == [], path
+        checked += 1
+    assert checked, "两份 Demo JSON 都不在，验收无从谈起"
 
 
 def test_时间从扁平变成_timing(rich_v1):

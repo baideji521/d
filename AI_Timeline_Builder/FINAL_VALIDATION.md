@@ -89,7 +89,7 @@ AI → EditingDecision → EditingPlanner → TimelineModel → 稀疏 JSON → 
 
 ## 7. 无声数据丢失的处理（§33）
 
-v2 → v1 降级不再静默丢字段：`TimelineModel.load()` 调 `downgrade_losses()`，
+v2 → v1 降级不再静默丢字段：`TimelineModel.set_timeline()` 调 `downgrade_losses()`，
 把每一条丢失写进 `report["downgrade_losses"]` 并逐条 `logMessage.emit()`。
 无损降级时**不写**这个字段（避免噪音）。由 `tests/test_timeline_model.py` 两条用例锁死。
 

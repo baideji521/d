@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "name": "custom_caption_001",
+      "label": "自定义 custom_caption_001",
+      "caption_style": "word_by_word",
+      "description": "由属性面板保存",
+      "style": {
+        "fontFamily": "Arial",
+        "fontSize": 64,
+        "fontWeight": 800,
+        "color": "#FFFFFF",
+        "align": "center",
+        "stroke": {
+          "width": 6,
+          "color": "#000000"
+        }
+      },
+      "highlight": {},
+      "transform": {
+        "y": 0.82
+      }
+    }
+  ]
+}

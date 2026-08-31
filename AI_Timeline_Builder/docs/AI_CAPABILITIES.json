@@ -2562,6 +2562,12 @@
           "duration": 1.699
         },
         {
+          "id": "sfx_tts_004",
+          "category": "tts",
+          "path": "assets/audio/tts/voice_en_female.wav",
+          "duration": 3.414
+        },
+        {
           "id": "sfx_ui_001",
           "category": "ui",
           "path": "assets/audio/ui/back_001.ogg",
@@ -3302,7 +3308,7 @@
       ],
       "count_by_category": {
         "bgm": 1,
-        "tts": 1,
+        "tts": 2,
         "boom": 2,
         "impact": 41,
         "whoosh": 3,
@@ -3519,6 +3525,14 @@
         "ai_highlight": {
           "label": "AI 精彩点",
           "color": "#f6ad55"
+        },
+        "voice_peak": {
+          "label": "配音重音",
+          "color": "#f687b3"
+        },
+        "voice_pause": {
+          "label": "配音停顿",
+          "color": "#63b3ed"
         }
       }
     },
@@ -3621,16 +3635,25 @@
         "requires_asset": true
       }
     ],
+    "schema": "schemas/editing_decision_schema.json",
+    "contract": "AI 的输出**只能**是 EditingDecision 列表（{\"decisions\": [...]}），不是 Timeline JSON，不是 TSX，也不是 ffmpeg 命令行。Timeline JSON 由 EditingPlanner 生成，由 TimelineValidator 判定",
     "decision_shape": {
       "action": "zoom",
       "target": "clip_003",
       "start": 12.4,
       "duration": 0.6,
-      "params": {
+      "parameters": {
         "scale_to": 1.2
       },
-      "reason": "强调反应瞬间"
-    }
+      "reason": "强调反应瞬间",
+      "confidence": 0.8
+    },
+    "runtime_ignores": [
+      "reason",
+      "confidence",
+      "decision_id"
+    ],
+    "provenance": "reason / confidence / 输入引用写进 decisions.json（core/provenance.py），不进 timeline.json —— 删掉它渲染结果一模一样"
   },
   "rules": {
     "note": "校验规则全表。level=error 会阻止导出，warning 只提示",
@@ -3784,6 +3807,13 @@
         "description": "声明了 safe_area 的元素，其 transform 位置必须落在当前平台安全区内"
       },
       {
+        "id": "RULE_SAFE_AREA_002",
+        "category": "SAFE_AREA",
+        "level": "warning",
+        "kind": "check",
+        "description": "字幕 / 文字 / 叠加素材即使没声明 safe_area，位置落在安全区外也提示（发布后可能被平台 UI 压住）"
+      },
+      {
         "id": "RULE_TEXT_001",
         "category": "TEXT",
         "level": "error",
@@ -3921,14 +3951,29 @@
     "closing_clip_exempt": true
   },
   "safe_area": {
-    "note": "元素写 safe_area: true 才受约束；内缩比例是各平台界面的实测估算值，不是平台官方规范，只用于提示与自动收位，不改渲染结果",
-    "location": "meta.safe_area.preset",
+    "note": "安全区是**排版约束**：字幕 / 文字 / 叠加素材越界会被 RULE_SAFE_AREA_002 提示（warning），显式写 safe_area: true 的元素越界是 RULE_SAFE_AREA_001 （error）。内缩比例是各平台界面的实测估算值，不是平台官方规范；Remotion 不读它，既不会画出安全框，也不会在渲染时偷偷挪位置 —— 要收位就显式调 clamp_to_safe_area()，结果写回 transform",
+    "location": "meta.safe_area",
     "default": "generic",
+    "version": 1,
+    "source": "empirical",
+    "constrained_types": [
+      "caption",
+      "caption_group",
+      "text",
+      "overlay"
+    ],
+    "meta_shape": {
+      "preset": "tiktok",
+      "version": 1,
+      "source": "empirical"
+    },
     "presets": [
       {
         "id": "tiktok",
         "label": "抖音 / TikTok",
         "note": "右侧头像与按钮列、底部文案与导航栏占位最多",
+        "version": 1,
+        "source": "empirical",
         "insets": {
           "top": 0.11,
           "bottom": 0.21,
@@ -3946,6 +3991,8 @@
         "id": "youtube_shorts",
         "label": "YouTube Shorts",
         "note": "底部标题 + 订阅条，右侧互动按钮",
+        "version": 1,
+        "source": "empirical",
         "insets": {
           "top": 0.08,
           "bottom": 0.16,
@@ -3963,6 +4010,8 @@
         "id": "instagram_reels",
         "label": "Instagram Reels",
         "note": "底部文案区最高，右侧按钮列略窄",
+        "version": 1,
+        "source": "empirical",
         "insets": {
           "top": 0.1,
           "bottom": 0.2,
@@ -3980,6 +4029,8 @@
         "id": "generic",
         "label": "通用（四边各留 5%）",
         "note": "不确定投放平台时的保守值",
+        "version": 1,
+        "source": "empirical",
         "insets": {
           "top": 0.05,
           "bottom": 0.05,
@@ -4029,14 +4080,59 @@
     ],
     "providers": [
       {
+        "id": "edge",
+        "label": "Edge 神经网络语音（在线，免费无 key）",
+        "kind": "cloud",
+        "available": true,
+        "requires_network": true,
+        "requires_credentials": false,
+        "supports_word_timestamps": false,
+        "supported_params": [
+          "voice_id",
+          "language",
+          "speed",
+          "pitch",
+          "stability"
+        ],
+        "capabilities": {
+          "supports_word_timestamps": false,
+          "supports_speed": true,
+          "supports_pitch": true,
+          "supports_style": false,
+          "supports_emotion": false,
+          "supports_energy": true,
+          "supports_ssml": false
+        },
+        "languages": [
+          "en-US",
+          "en-GB"
+        ],
+        "styles": [
+          "natural"
+        ]
+      },
+      {
         "id": "system",
         "label": "系统自带语音（Windows SAPI）",
+        "kind": "local",
+        "available": true,
+        "requires_network": false,
+        "requires_credentials": false,
         "supports_word_timestamps": false,
         "supported_params": [
           "voice_id",
           "language",
           "speed"
         ],
+        "capabilities": {
+          "supports_word_timestamps": false,
+          "supports_speed": true,
+          "supports_pitch": false,
+          "supports_style": false,
+          "supports_emotion": false,
+          "supports_energy": false,
+          "supports_ssml": false
+        },
         "languages": [
           "en-US",
           "zh-CN"
@@ -4050,16 +4146,16 @@
   "assets": {
     "note": "素材语义类型与建议轨道。AI 只能引用清单里已有的 asset id",
     "summary": {
-      "total": 251,
+      "total": 253,
       "by_type": {
-        "video": 4,
+        "video": 5,
         "image": 0,
         "sticker": 0,
         "overlay": 1,
         "transition_material": 6,
         "effect_material": 0,
         "music": 1,
-        "voice": 1,
+        "voice": 2,
         "sfx": 238,
         "font": 0
       },

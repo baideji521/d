@@ -27,6 +27,11 @@ MARKER_TYPES: Dict[str, Dict[str, str]] = {
     "caption": {"label": "字幕", "color": "#ffe347"},
     "sfx": {"label": "音效", "color": "#b794f4"},
     "ai_highlight": {"label": "AI 精彩点", "color": "#f6ad55"},
+    # 配音派生的标记（VoiceDirector → VoicePlanCompiler 写入）。
+    # 单独两类而不是复用 ai_highlight：报告和 EditingPlanner 要能分清
+    # 「这是声音里的重音」和「这是画面上的精彩点」，两者该配的动作不一样。
+    "voice_peak": {"label": "配音重音", "color": "#f687b3"},
+    "voice_pause": {"label": "配音停顿", "color": "#63b3ed"},
 }
 
 DEFAULT_TYPE = "normal"

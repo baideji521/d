@@ -39,10 +39,11 @@
   "target": "clip_003",
   "start": 12.4,
   "duration": 0.6,
-  "params": {
+  "parameters": {
     "scale_to": 1.2
   },
-  "reason": "强调反应瞬间"
+  "reason": "强调反应瞬间",
+  "confidence": 0.8
 }
 ```
 
@@ -78,7 +79,9 @@
 
 ## 安全区
 
-元素写 safe_area: true 才受约束；内缩比例是各平台界面的实测估算值，不是平台官方规范，只用于提示与自动收位，不改渲染结果
+安全区是**排版约束**：字幕 / 文字 / 叠加素材越界会被 RULE_SAFE_AREA_002 提示（warning），显式写 safe_area: true 的元素越界是 RULE_SAFE_AREA_001 （error）。内缩比例是各平台界面的实测估算值，不是平台官方规范；Remotion 不读它，既不会画出安全框，也不会在渲染时偷偷挪位置 —— 要收位就显式调 clamp_to_safe_area()，结果写回 transform
+
+数值版本 v1（来源：empirical / 实测估算）。受约束的元素类型：caption, caption_group, text, overlay。
 
 | 档位 | 说明 | x 范围 | y 范围 |
 | --- | --- | --- | --- |
@@ -115,6 +118,7 @@
 | `RULE_KEYFRAME_002` | 错误 | Keyframe 参数名必须在允许列表内 |
 | `RULE_NUMBER_001` | 错误 | 所有数值字段必须是有限数字，不允许 NaN / Infinity |
 | `RULE_SAFE_AREA_001` | 错误 | 声明了 safe_area 的元素，其 transform 位置必须落在当前平台安全区内 |
+| `RULE_SAFE_AREA_002` | 警告 | 字幕 / 文字 / 叠加素材即使没声明 safe_area，位置落在安全区外也提示（发布后可能被平台 UI 压住） |
 | `RULE_TEXT_001` | 错误 | Text 元素必须有非空 content.text |
 | `RULE_TIME_001` | 错误 | 所有时间必须使用秒，禁止出现 frame 字段 |
 | `RULE_TIME_002` | 错误 | start 不得小于 0 |
@@ -141,6 +145,7 @@
 
 | provider | 逐词时间戳 | 支持参数 |
 | --- | --- | --- |
+| `edge` | 估算 | `voice_id` `language` `speed` `pitch` `stability` |
 | `system` | 估算 | `voice_id` `language` `speed` |
 
 ## 示例库

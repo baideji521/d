@@ -72,6 +72,7 @@ from gui.preview_widget import PreviewWidget
 from gui.property_panel import PropertyPanel
 from gui.timeline_widget import TimelineWidget
 from render.ffmpeg import FFmpeg
+from render.preview_audio import PreviewAudio
 from render.remotion_exporter import RemotionRenderWorker, find_node
 
 VIEW_MODES = [
@@ -133,7 +134,14 @@ class MainWindow(QMainWindow):
     def _build_panels(self) -> None:
         self.asset_panel = AssetPanel(self._assets, self._libraries.asset)
         self.library_panel = LibraryPanel(self._libraries)
-        self.preview = PreviewWidget(self._model, self._renderer)
+        # 预览音频与抽帧共用同一个缓存目录：一个放帧 PNG，一个放混音 WAV
+        self.preview_audio = PreviewAudio(
+            self._model,
+            self._assets,
+            os.path.join(self._root, ".cache", "preview"),
+            self,
+        )
+        self.preview = PreviewWidget(self._model, self._renderer, self.preview_audio)
         self.timeline = TimelineWidget(self._model)
         self.json_panel = JsonPanel(self._model, self._validator)
         self.property_panel = PropertyPanel(self._model, self._assets, self._libraries)
@@ -1824,6 +1832,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self.preview.stop()
+        self.preview_audio.shutdown()
         self._renderer.shutdown()
         if self._render_worker is not None and self._render_worker.isRunning():
             self._render_worker.wait(2000)

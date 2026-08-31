@@ -158,3 +158,110 @@ def test_参数白名单与风格表覆盖指令要求():
             "storytelling"} <= set(vc.STYLES)
     assert ("en-US", "en-GB") == vc.PRIMARY_LANGUAGES
     assert "female" in vc.GENDERS
+
+
+# ---------------------------------------------------------------- Edge provider
+# 这一组全部离线可跑：只验能力自述、参数映射与时间戳拼装，不发一个网络请求。
+
+
+def test_edge_provider_已注册且不抢默认位():
+    assert "edge" in vc.provider_ids()
+    # 默认仍然是 system：老调用方行为不能被换掉（要 Edge 得显式要）
+    assert isinstance(vc.get_provider(), vc.SystemVoiceProvider)
+    assert isinstance(vc.get_provider("edge"), vc.EdgeVoiceProvider)
+
+
+def test_edge_provider_如实声明能力():
+    provider = vc.get_provider("edge")
+    caps = provider.capabilities()
+    # 服务只回句级边界，所以逐词时间戳必须报 False
+    assert caps["supports_word_timestamps"] is False
+    assert caps["supports_speed"] and caps["supports_pitch"] and caps["supports_energy"]
+    # 这条链路不发 SSML，没有 style / emotion，不许虚报
+    assert caps["supports_style"] is False and caps["supports_emotion"] is False
+    assert caps["supports_ssml"] is False
+    assert provider.get_styles() == ["natural"]
+    assert provider.requires_network is True and provider.requires_credentials is False
+
+
+def test_edge_参数映射():
+    p = vc.EdgeVoiceProvider
+    assert p._rate(1.0) == "+0%" and p._rate(1.08) == "+8%" and p._rate(0.9) == "-10%"
+    assert p._pitch(0.0) == "+0Hz" and p._pitch(1.0) == "+12Hz" and p._pitch(-1.0) == "-12Hz"
+    # 半音夹在 ±4，换算后再夹到 ±50Hz，不许让音色变形
+    assert p._pitch(99.0) == "+48Hz"
+    # energy 经 VoiceProfile 映射成 stability = 1 - energy
+    assert p._volume(0.5) == "+0%"          # energy 0.5 → 不动
+    assert p._volume(0.25) == "+15%"        # energy 0.75 → 更有劲
+    assert p._volume(1.0) == "-30%"         # energy 0 → 最轻，且被夹住
+
+
+def test_edge_空文本直接失败且不联网():
+    result = vc.get_provider("edge").generate(vc.VoiceRequest(text="   "))
+    assert result.ok is False and result.audio_path == "" and result.error
+
+
+def test_edge_句级真值撑起句内词时间戳():
+    """句边界是引擎给的真值，句内按比例摊开：词不能跨句、末词对齐句尾。"""
+    sentences = [
+        {"text": "Wait, what?", "start": 0.10, "end": 2.00},
+        {"text": "No way this actually worked!", "start": 2.00, "end": 4.45},
+    ]
+    words = vc.EdgeVoiceProvider._words("Wait, what?! No way this actually worked!", sentences, 4.45)
+    assert words, "有句级边界时必须给出逐词时间戳"
+    assert words[0]["start"] == 0.10, "第一句要从引擎给的句首开始"
+    assert abs(words[-1]["end"] - 4.45) < 1e-6, "末词要严格落在末句句尾"
+    for word in words:
+        assert word["start"] <= word["end"]
+    # 第一句的词不能溢出到第二句里去
+    first_sentence = [w for w in words if w["end"] <= 2.0 + 1e-6]
+    assert first_sentence, "第一句的词被算到第二句里了"
+
+
+def test_edge_句子压线时词表仍然单调且不超出音频():
+    """真机实测发现的坑：引擎给的句子区间会互相压线、还会超出音频时长。
+
+    这两种情况都会让 caption_group 的逐词高亮来回跳，所以 _words 要收口。
+    """
+    sentences = [
+        {"text": "Wait, what?", "start": 0.10, "end": 2.00},
+        {"text": "No way this actually worked!", "start": 1.80, "end": 3.70},
+    ]
+    words = vc.EdgeVoiceProvider._words("Wait, what?! No way this actually worked!",
+                                        sentences, 3.60)
+    assert words
+    previous = -1.0
+    for word in words:
+        assert word["start"] <= word["end"], word
+        assert word["start"] >= previous - 1e-6, f"词表不单调：{word}"
+        previous = word["end"]
+    assert words[-1]["end"] <= 3.60 + 1e-6, "末词不许超出音频实际时长"
+
+
+def test_edge_没有句级边界时退回整段估算():
+    words = vc.EdgeVoiceProvider._words("Hello there friend", [], 1.5)
+    assert [w["text"] for w in words] == ["Hello", "there", "friend"]
+    assert abs(words[-1]["end"] - 1.5) < 1e-6
+
+
+@pytest.mark.skipif(not vc.get_provider("system").available(), reason="本机没有系统语音合成")
+def test_中文目标路径能真的合成出音频(tmp_path):
+    """真跑一次 SAPI：中文台词做出来的文件名不能把配音链路打断。
+
+    字幕逐行配音的产物名来自台词本身（core/tts.output_path），
+    所以「路径带中文」是常态而不是边角情况。
+    """
+    target = tmp_path / "中文目录" / "第一行台词.wav"
+    result = vc.get_provider("system").generate(
+        vc.VoiceRequest(text="Okay, let us see what happens here.", out_path=str(target))
+    )
+    assert result.ok, result.error
+    assert target.is_file() and target.stat().st_size > 1024
+
+
+def test_首选顺序把_edge_放在_sapi_前面而且兜得住():
+    assert vc.PREFERRED_ORDER[0] == "edge" and "system" in vc.PREFERRED_ORDER
+    # 一个都不可用时也要给出 system，而不是 None（调用方不必判空）
+    assert vc.best_provider(order=("不存在的家",)) is vc.get_provider("system")
+    chosen = vc.best_provider()
+    assert chosen is not None and chosen.available() or chosen.id == "system"

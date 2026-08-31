@@ -107,6 +107,7 @@ def main() -> int:
     # 抽帧线程就会带着运行状态被 Qt 销毁 —— 那是进程级 fastfail（0xC0000409），
     # 用户看到的现象是「什么都没动，程序自己崩了」。shutdown() 是幂等的。
     app.aboutToQuit.connect(window.preview.stop)
+    app.aboutToQuit.connect(window.preview_audio.shutdown)
     app.aboutToQuit.connect(renderer.shutdown)
 
 

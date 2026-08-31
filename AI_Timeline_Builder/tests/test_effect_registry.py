@@ -441,12 +441,22 @@ def test_make_effect_产出的元素能过_Registry(registry: EffectLibrary) -> 
 
 
 def test_真实_timeline_json_里的特效全部已注册(registry: EffectLibrary) -> None:
-    path = os.path.join(ROOT, "remotion", "timeline.json")
-    if not os.path.exists(path):
-        pytest.skip("remotion/timeline.json 不存在")
-    with open(path, "r", encoding="utf-8") as handle:
-        data = json.load(handle)
-    effects = [e for e in data.get("elements", []) if e.get("type") == "effect"]
+    """Demo 权威副本（tests/fixtures/demo_timeline.json）必须有特效且全部已注册。
+
+    `remotion/timeline.json` 是「最后一次导出」的产物，导一次就被覆盖一次，
+    所以它只被要求「里面出现的特效必须已注册」。
+    """
+    fixture = os.path.join(ROOT, "tests", "fixtures", "demo_timeline.json")
+    assert os.path.isfile(fixture), "Demo 权威副本没了，先跑 tools/build_fixtures.py build"
+    with open(fixture, "r", encoding="utf-8") as handle:
+        effects = [e for e in json.load(handle).get("elements", [])
+                   if e.get("type") == "effect"]
+    assert effects, "Demo 里应当至少有一个特效"
+    exported = os.path.join(ROOT, "remotion", "timeline.json")
+    if os.path.isfile(exported):
+        with open(exported, "r", encoding="utf-8") as handle:
+            effects += [e for e in json.load(handle).get("elements", [])
+                        if e.get("type") == "effect"]
     for element in effects:
         assert registry.has(element.get("name")), element
         assert registry.get(element["name"]).element_type == "effect"

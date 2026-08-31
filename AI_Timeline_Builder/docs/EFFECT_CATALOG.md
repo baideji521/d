@@ -20,32 +20,32 @@
 
 ## 一览
 
-| name | 中文名 | 分类 | kind | renderer | 默认时长 |
-| --- | --- | --- | --- | --- | --- |
-| `bounce` | Bounce 弹跳 | 运动（geometry） | `program` | `bounce` | 0.5s |
-| `pulse` | Pulse 呼吸 | 运动（geometry） | `program` | `pulse` | 0.8s |
-| `shake` | Shake 抖动 | 运动（geometry） | `program` | `shake` | 0.4s |
-| `spin` | Spin 旋转 | 运动（geometry） | `program` | `spin` | 0.5s |
-| `zoom` | Zoom 推拉 | 运动（geometry） | `program` | `zoom` | 0.6s |
-| `dust` | Dust 灰尘 | 素材特效（overlay） | `material` | `—` | 2s |
-| `explosion` | Explosion 爆炸 | 素材特效（overlay） | `material` | `—` | 0.8s |
-| `fire` | Fire 火焰 | 素材特效（overlay） | `material` | `—` | 1.2s |
-| `glow` | Glow 光晕 | 素材特效（overlay） | `material` | `—` | 0.8s |
-| `light_leak` | Light Leak 漏光 | 素材特效（overlay） | `material` | `—` | 1s |
-| `lightning` | Lightning 闪电 | 素材特效（overlay） | `material` | `—` | 0.5s |
-| `particle` | Particle 粒子 | 素材特效（overlay） | `material` | `—` | 1.5s |
-| `smoke` | Smoke 烟雾 | 素材特效（overlay） | `material` | `—` | 1.5s |
-| `spark` | Spark 火花 | 素材特效（overlay） | `material` | `—` | 0.6s |
-| `speed_lines` | Speed Lines 速度线 | 素材特效（overlay） | `material` | `—` | 0.5s |
-| `flash` | Flash 闪白 | 光效（screen） | `program` | `flash` | 0.2s |
-| `glitch` | Glitch 故障 | 风格（screen） | `program` | `glitch` | 0.35s |
-| `rgb_split` | RGB Split 色差 | 风格（screen） | `program` | `rgb_split` | 0.3s |
-| `vignette` | Vignette 暗角 | 光效（screen） | `program` | `vignette` | 1s |
-| `blur` | Blur 模糊 | 画质（visual） | `program` | `blur` | 0.5s |
-| `brightness` | Brightness 亮度 | 调色（visual） | `program` | `brightness` | 0.5s |
-| `contrast` | Contrast 对比度 | 调色（visual） | `program` | `contrast` | 0.5s |
-| `motion_blur` | Motion Blur 运动模糊 | 画质（visual） | `program` | `motion_blur` | 0.3s |
-| `saturation` | Saturation 饱和度 | 调色（visual） | `program` | `saturation` | 0.5s |
+| name | 中文名 | 分类 | kind | renderer | 默认时长 | 素材可用性 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `bounce` | Bounce 弹跳 | 运动（geometry） | `program` | `bounce` | 0.5s | 不需要素材（程序渲染） |
+| `pulse` | Pulse 呼吸 | 运动（geometry） | `program` | `pulse` | 0.8s | 不需要素材（程序渲染） |
+| `shake` | Shake 抖动 | 运动（geometry） | `program` | `shake` | 0.4s | 不需要素材（程序渲染） |
+| `spin` | Spin 旋转 | 运动（geometry） | `program` | `spin` | 0.5s | 不需要素材（程序渲染） |
+| `zoom` | Zoom 推拉 | 运动（geometry） | `program` | `zoom` | 0.6s | 不需要素材（程序渲染） |
+| `dust` | Dust 灰尘 | 素材特效（overlay） | `material` | `—` | 2s | AVAILABLE：`overlay_dust_001` |
+| `explosion` | Explosion 爆炸 | 素材特效（overlay） | `material` | `—` | 0.8s | MISSING：素材库里没有对应文件，放上去之前渲染不出东西 |
+| `fire` | Fire 火焰 | 素材特效（overlay） | `material` | `—` | 1.2s | MISSING：素材库里没有对应文件，放上去之前渲染不出东西 |
+| `glow` | Glow 光晕 | 素材特效（overlay） | `material` | `—` | 0.8s | MISSING：素材库里没有对应文件，放上去之前渲染不出东西 |
+| `light_leak` | Light Leak 漏光 | 素材特效（overlay） | `material` | `—` | 1s | AVAILABLE：`overlay_lightleak_001` |
+| `lightning` | Lightning 闪电 | 素材特效（overlay） | `material` | `—` | 0.5s | MISSING：素材库里没有对应文件，放上去之前渲染不出东西 |
+| `particle` | Particle 粒子 | 素材特效（overlay） | `material` | `—` | 1.5s | MISSING：素材库里没有对应文件，放上去之前渲染不出东西 |
+| `smoke` | Smoke 烟雾 | 素材特效（overlay） | `material` | `—` | 1.5s | MISSING：素材库里没有对应文件，放上去之前渲染不出东西 |
+| `spark` | Spark 火花 | 素材特效（overlay） | `material` | `—` | 0.6s | MISSING：素材库里没有对应文件，放上去之前渲染不出东西 |
+| `speed_lines` | Speed Lines 速度线 | 素材特效（overlay） | `material` | `—` | 0.5s | MISSING：素材库里没有对应文件，放上去之前渲染不出东西 |
+| `flash` | Flash 闪白 | 光效（screen） | `program` | `flash` | 0.2s | 不需要素材（程序渲染） |
+| `glitch` | Glitch 故障 | 风格（screen） | `program` | `glitch` | 0.35s | 不需要素材（程序渲染） |
+| `rgb_split` | RGB Split 色差 | 风格（screen） | `program` | `rgb_split` | 0.3s | 不需要素材（程序渲染） |
+| `vignette` | Vignette 暗角 | 光效（screen） | `program` | `vignette` | 1s | 不需要素材（程序渲染） |
+| `blur` | Blur 模糊 | 画质（visual） | `program` | `blur` | 0.5s | 不需要素材（程序渲染） |
+| `brightness` | Brightness 亮度 | 调色（visual） | `program` | `brightness` | 0.5s | 不需要素材（程序渲染） |
+| `contrast` | Contrast 对比度 | 调色（visual） | `program` | `contrast` | 0.5s | 不需要素材（程序渲染） |
+| `motion_blur` | Motion Blur 运动模糊 | 画质（visual） | `program` | `motion_blur` | 0.3s | 不需要素材（程序渲染） |
+| `saturation` | Saturation 饱和度 | 调色（visual） | `program` | `saturation` | 0.5s | 不需要素材（程序渲染） |
 
 ## 逐个说明
 
@@ -131,6 +131,7 @@
 - 默认时长：2s
 - 可作用元素：—
 - 说明：空气尘埃，做氛围层
+- 素材可用性：AVAILABLE —— `overlay_dust_001`
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -147,6 +148,7 @@
 - 默认时长：0.8s
 - 可作用元素：—
 - 说明：爆炸素材，常配 Impact 音效
+- 素材可用性：**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / `assets/transitions` 里没有对应素材文件；在导入素材之前它渲染不出任何画面
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -163,6 +165,7 @@
 - 默认时长：1.2s
 - 可作用元素：—
 - 说明：火焰素材叠加，建议放 V3/V4 轨
+- 素材可用性：**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / `assets/transitions` 里没有对应素材文件；在导入素材之前它渲染不出任何画面
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -179,6 +182,7 @@
 - 默认时长：0.8s
 - 可作用元素：—
 - 说明：光晕素材
+- 素材可用性：**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / `assets/transitions` 里没有对应素材文件；在导入素材之前它渲染不出任何画面
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -195,6 +199,7 @@
 - 默认时长：1s
 - 可作用元素：—
 - 说明：漏光素材，适合做转场衔接
+- 素材可用性：AVAILABLE —— `overlay_lightleak_001`
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -211,6 +216,7 @@
 - 默认时长：0.5s
 - 可作用元素：—
 - 说明：闪电，配合 Flash 效果更强
+- 素材可用性：**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / `assets/transitions` 里没有对应素材文件；在导入素材之前它渲染不出任何画面
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -227,6 +233,7 @@
 - 默认时长：1.5s
 - 可作用元素：—
 - 说明：通用粒子素材
+- 素材可用性：**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / `assets/transitions` 里没有对应素材文件；在导入素材之前它渲染不出任何画面
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -243,6 +250,7 @@
 - 默认时长：1.5s
 - 可作用元素：—
 - 说明：烟雾素材叠加
+- 素材可用性：**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / `assets/transitions` 里没有对应素材文件；在导入素材之前它渲染不出任何画面
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -259,6 +267,7 @@
 - 默认时长：0.6s
 - 可作用元素：—
 - 说明：火花粒子
+- 素材可用性：**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / `assets/transitions` 里没有对应素材文件；在导入素材之前它渲染不出任何画面
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |
@@ -275,6 +284,7 @@
 - 默认时长：0.5s
 - 可作用元素：—
 - 说明：速度线，强调运动方向
+- 素材可用性：**MISSING** —— 注册表里有这个特效，但 `assets/overlays` / `assets/transitions` 里没有对应素材文件；在导入素材之前它渲染不出任何画面
 
 | 参数 | 名称 | 类型 | 默认 | 取值 |
 | --- | --- | --- | --- | --- |

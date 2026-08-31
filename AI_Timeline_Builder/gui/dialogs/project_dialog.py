@@ -194,8 +194,11 @@ class ProjectSettingsDialog(QDialog):
             "background": self._background.currentText().strip() or "#000000",
             # 通用档也照实写进 meta；落盘时 core/sparse.py 会把默认值那一份删掉，
             # 所以「改成抖音再改回通用」不会留下残渣。
-            "safe_area": {"preset": str(self._safe_area.currentData()
-                                        or sa.DEFAULT_PRESET_ID)},
+            # 带上 version / source：内缩比例是实测估算值，不是平台官方规范，
+            # 工程文件得自己说清数字的版本与来源（指令第二十三条）。
+            "safe_area": sa.preset_meta(
+                str(self._safe_area.currentData() or sa.DEFAULT_PRESET_ID)
+            ),
         }
 
 

@@ -114,6 +114,18 @@ class FFmpeg:
                     self._live = None
         return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
+    def run_command(
+        self, command: List[str], timeout: float = 120
+    ) -> Optional[subprocess.CompletedProcess]:
+        """跑一条自己拼好的 ffmpeg 命令（预览混音这类特殊滤镜链用）。
+
+        走的是同一个可取消的 `_run()`，所以 `cancel()` 一样能立刻掐掉它。
+        返回 None 表示启动失败 / 超时 / 已取消。
+        """
+        if not command:
+            return None
+        return self._run(command, timeout=timeout)
+
     def cancel(self) -> None:
         """要退出了：不再启新子进程，并把正在跑的那个立刻杀掉。
 

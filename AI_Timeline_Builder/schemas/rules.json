@@ -202,6 +202,11 @@
       "id": "RULE_SAFE_AREA_001",
       "level": "error",
       "description": "声明了 safe_area 的元素，其 transform 位置必须落在当前平台安全区内"
+    },
+    {
+      "id": "RULE_SAFE_AREA_002",
+      "level": "warning",
+      "description": "字幕 / 文字 / 叠加素材即使没声明 safe_area，位置落在安全区外也提示（发布后可能被平台 UI 压住）"
     }
   ],
   "keyframe_params": [

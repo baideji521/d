@@ -53,6 +53,15 @@
       "properties": {
         "preset": {
           "enum": ["tiktok", "youtube_shorts", "instagram_reels", "generic"]
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "内缩数值的版本号，改过任何档位的数字就 +1"
+        },
+        "source": {
+          "enum": ["empirical"],
+          "description": "数值来源。只有实测估算一种；平台没有官方安全区规范，不许写成 official"
         }
       }
     },
@@ -63,7 +72,8 @@
       "properties": {
         "time": { "type": "number", "minimum": 0 },
         "type": {
-          "enum": ["normal", "highlight", "transition", "caption", "sfx", "ai_highlight"]
+          "enum": ["normal", "highlight", "transition", "caption", "sfx", "ai_highlight",
+                   "voice_peak", "voice_pause"]
         },
         "label": { "type": "string" }
       }

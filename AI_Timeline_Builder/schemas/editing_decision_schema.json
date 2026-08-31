@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EditingDecision",
+  "description": "AI 与本工具之间的唯一协议：AI 的输出**只能**是 EditingDecision 列表，不是 Timeline JSON，也不是 TSX。Timeline JSON 由 EditingPlanner 生成、由 TimelineValidator 判定。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decisions"],
+  "properties": {
+    "decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/decision" }
+    },
+    "note": {
+      "type": "string",
+      "description": "整批决策的说明。给人看的，不参与渲染"
+    }
+  },
+  "definitions": {
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "description": "决策 id。省略时由 Planner 按顺序生成（dec_001…），用于把产出元素与决策对上"
+        },
+        "action": {
+          "description": "做什么。白名单外的动作一律报 UNKNOWN_ACTION，不许编造",
+          "enum": [
+            "cut",
+            "trim",
+            "highlight",
+            "freeze",
+            "zoom",
+            "effect",
+            "transition",
+            "overlay",
+            "caption",
+            "sfx",
+            "voice",
+            "music"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "description": "作用在哪个元素上（cut / trim / freeze 必填）。省略时按 start 找当前在播的视频片段"
+        },
+        "start": {
+          "type": "number",
+          "minimum": 0,
+          "description": "时间线绝对秒数。Planner 会吸到整帧"
+        },
+        "duration": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "持续秒数。省略时用该能力的默认时长"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "动作参数（zoom 的 scale_to、caption 的 text、effect 的 name 等）。参数名必须是 Registry 里注册过的；不认识的参数会被报 UNKNOWN_PARAMETER 并在渲染时忽略"
+        },
+        "reason": {
+          "type": "string",
+          "description": "为什么这么剪。**不参与渲染**，Runtime 完全不读它；会进决策溯源日志，供人复核 AI 的判断"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "AI 对这条决策的置信度。只进溯源日志，不影响渲染结果，也不会被工具用来自动丢弃决策"
+        }
+      }
+    }
+  }
+}

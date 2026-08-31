@@ -167,17 +167,35 @@ def test_越界的元素会被收进安全区():
     assert element["transform"].get("y") == 0.5
 
 
-def test_只有声明了_safe_area_的元素才被检查(engine):
+def test_没声明_safe_area_的字幕越界报_002_声明了报_001(engine):
+    """安全区是排版约束，对所有排版元素生效（指令第二十一条）。
+
+    没声明 = 提示（002，warning，不拦渲染）；声明了 = 强约束（001，error）。
+    """
     element = tl.make_text("text_001", "太靠下了", start=0.0, duration=1.0)
     element["transform"] = {"y": 0.95}
     data = timeline_with(element)
     data["meta"]["safe_area"] = {"preset": "tiktok"}
-    assert engine.check(data) == []  # 没声明 safe_area，工具不该管
+    findings = engine.check(data)
+    assert [f.rule_id for f in findings] == ["RULE_SAFE_AREA_002"]
+    assert "可能被平台 UI 压住" in findings[0].message
 
     element["safe_area"] = True
     findings = engine.check(data)
+    # 声明了就归 001，不会两条规则同时报同一个元素
     assert [f.rule_id for f in findings] == ["RULE_SAFE_AREA_001"]
     assert "安全区外" in findings[0].message
+
+
+def test_视频与冻帧不受安全区约束(engine):
+    """满屏是视频该有的样子，把它收进安全区等于自己给画面加黑边。"""
+    element = tl.make_video(
+        "clip_001", "video_001", "V1", start=0.0, source_start=0.0, source_end=2.0
+    )
+    element["transform"] = {"y": 0.99}
+    data = timeline_with(element)
+    data["meta"]["safe_area"] = {"preset": "tiktok"}
+    assert engine.check(data) == []
 
 
 def test_声明了_safe_area_且真的在区内就不报(engine):
@@ -195,6 +213,69 @@ def test_没有位置语义的元素声明_safe_area_会被指出来(engine):
     findings = engine.check(timeline_with(element))
     assert [f.rule_id for f in findings] == ["RULE_SAFE_AREA_001"]
     assert "没有位置语义" in findings[0].message
+
+
+# ---------------------------------------------------------------- 一键收位
+
+
+def test_一键收位把越界元素写回合法位置():
+    caption = tl.make_caption("caption_001", "太靠下", start=0.0, duration=1.0)
+    caption["transform"] = {"y": 0.96}
+    video = tl.make_video(
+        "clip_001", "video_001", "V1", start=0.0, source_start=0.0, source_end=2.0
+    )
+    video["transform"] = {"y": 0.99}
+    data = timeline_with(caption)
+    data["elements"].append(video)
+    data["meta"]["safe_area"] = {"preset": "tiktok"}
+
+    moved = sa.clamp_to_safe_area(data)
+    assert [row["id"] for row in moved] == ["caption_001"]  # 视频不动
+    _, _, _, bottom = sa.box("tiktok")
+    assert caption["transform"]["y"] == pytest.approx(round(bottom, 4))
+    assert video["transform"]["y"] == 0.99
+    # 收完位就该彻底干净：Timeline JSON 里记录的就是最终合法位置
+    assert sa.violations(data) == []
+
+
+def test_只收声明过的元素():
+    loose = tl.make_caption("caption_001", "没声明", start=0.0, duration=1.0)
+    loose["transform"] = {"y": 0.96}
+    locked = tl.make_caption("caption_002", "声明了", start=1.0, duration=1.0)
+    locked["transform"] = {"y": 0.96}
+    locked["safe_area"] = True
+    data = timeline_with(loose)
+    data["elements"].append(locked)
+    data["meta"]["safe_area"] = {"preset": "tiktok"}
+
+    moved = sa.clamp_to_safe_area(data, only_locked=True)
+    assert [row["id"] for row in moved] == ["caption_002"]
+    assert loose["transform"]["y"] == 0.96
+
+
+# ---------------------------------------------------------------- 数值版本
+
+
+def test_档位记录带版本与来源():
+    meta = sa.preset_meta("tiktok")
+    assert meta == {"preset": "tiktok", "version": sa.PRESET_VERSION, "source": "empirical"}
+    # 不认识的档位退回通用，但不许静默丢掉版本信息
+    assert sa.preset_meta("喵")["preset"] == "generic"
+
+
+def test_老工程缺版本时按_v1_补齐():
+    data = {"meta": {"safe_area": {"preset": "youtube_shorts"}}}
+    meta = sa.timeline_preset_meta(data)
+    assert meta["version"] == 1
+    assert meta["source"] == "empirical"
+    assert meta["preset"] == "youtube_shorts"
+
+
+def test_档位数值不许自称官方规范():
+    for row in sa.catalog():
+        assert row["source"] == "empirical"
+        assert row["version"] == sa.PRESET_VERSION
+
 
 
 def test_安全区档位表能导出给文档():

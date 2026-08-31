@@ -82,10 +82,35 @@ HIGHLIGHT_SCALE_TO = 1.25
 #: 挑音效时优先用哪些分类（AssetRegistry 里的 category）
 IMPACT_CATEGORIES = ("impact", "boom", "whoosh")
 
+#: voice marker → 剪辑动作的映射（指令第十七条）。
+#:
+#: VoiceDirector **不许**自己往时间线上加特效 —— 它只产出 voice_peak /
+#: voice_pause 标记，说明「这里是重音 / 这里有停顿」。要不要因此推镜、
+#: 加音效，是剪辑决策，必须走 EditingDecision → 白名单 → Planner → RuleEngine
+#: 这条正路。映射表放在 Planner 这一侧，因为白名单归它管。
+#:
+#: voice_pause 故意**不映射任何动作**：停顿是节奏信息，不是「该加东西」的信号。
+#: 它会被如实报成 VOICE_MARKER_NO_ACTION，而不是硬凑一个特效上去。
+VOICE_MARKER_ACTIONS: Dict[str, Dict[str, Any]] = {
+    "voice_peak": {
+        "action": "zoom",
+        "duration": 0.4,
+        "params": {"scale_to": 1.12},
+    },
+}
+
+#: 两个重音挨得太近时只保留第一个 —— 0.2 秒里连推三次镜头是抽搐不是强调
+VOICE_PEAK_MIN_GAP = 0.35
+
+
 
 @dataclass
 class EditingDecision:
     """一条剪辑决策。这是 AI 与本工具之间的**唯一**协议对象。
+
+    唯一一条契约（指令第三十三条）：**AI 的输出就是 EditingDecision 列表**，
+    不是 Timeline JSON，不是 TSX，也不是 ffmpeg 命令行。
+    JSON 形状见 `schemas/editing_decision_schema.json`。
 
     字段语义：
 
@@ -93,9 +118,13 @@ class EditingDecision:
     - target：作用在哪个元素上（cut / trim / freeze / zoom / effect 需要）
     - start：时间线绝对秒数
     - duration：持续秒数；省略时按能力的默认时长
-    - params：动作参数（例如 zoom 的 scale_to、caption 的 text）
-    - reason：为什么这么剪。**不参与渲染**，但会写进报告，
-      让人能复核 AI 的判断而不是只看到结果。
+    - params：动作参数（例如 zoom 的 scale_to、caption 的 text）。
+      JSON 里的规范键名是 `parameters`，`params` 作为别名一样收。
+    - reason：为什么这么剪。**不参与渲染**，Runtime 一个字都不读；
+      它进决策溯源日志（core/provenance.py），让人能复核 AI 的判断而不是只看到结果。
+    - confidence：AI 自报的置信度（0..1）。同样只进溯源日志 ——
+      工具**不会**拿它自动丢决策，免得「低置信度就悄悄不执行」这种看不见的行为。
+    - decision_id：省略时由 Planner 按顺序补（dec_001…），用来把产出元素与决策对上。
     """
 
     action: str
@@ -104,6 +133,8 @@ class EditingDecision:
     duration: Optional[float] = None
     params: Dict[str, Any] = field(default_factory=dict)
     reason: str = ""
+    confidence: Optional[float] = None
+    decision_id: str = ""
 
     @classmethod
     def from_dict(cls, raw: Any) -> "EditingDecision":
@@ -122,13 +153,14 @@ class EditingDecision:
         action = str(raw.get("action") or raw.get("decision") or "")
         start = raw.get("start", raw.get("time", 0.0))
         duration = raw.get("duration")
-        params = dict(raw.get("params") or {})
+        params = dict(raw.get("parameters") or raw.get("params") or {})
         # {"actions": [...]} 是 highlight 那种复合写法，收进 params 里统一处理
         if raw.get("actions"):
             params.setdefault("steps", list(raw["actions"]))
         for extra in ("text", "asset", "name", "from", "to", "source_time", "at"):
             if extra in raw and extra not in params:
                 params[extra] = raw[extra]
+        confidence = raw.get("confidence")
         return cls(
             action=action,
             target=str(raw.get("target") or ""),
@@ -136,18 +168,24 @@ class EditingDecision:
             duration=None if duration is None else tl.as_seconds(duration),
             params=params,
             reason=str(raw.get("reason") or ""),
+            confidence=None if confidence is None else tl.as_seconds(confidence),
+            decision_id=str(raw.get("decision_id") or ""),
         )
 
     def to_dict(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"action": self.action, "start": self.start}
+        if self.decision_id:
+            payload["decision_id"] = self.decision_id
         if self.target:
             payload["target"] = self.target
         if self.duration is not None:
             payload["duration"] = self.duration
         if self.params:
-            payload["params"] = copy.deepcopy(self.params)
+            payload["parameters"] = copy.deepcopy(self.params)
         if self.reason:
             payload["reason"] = self.reason
+        if self.confidence is not None:
+            payload["confidence"] = self.confidence
         return payload
 
 
@@ -159,6 +197,8 @@ class PlanIssue:
     message: str
     action: str = ""
     target: str = ""
+    #: 哪条决策引出的。Planner 会自动补，用于溯源（core/provenance.py）
+    decision_id: str = ""
 
     def to_dict(self) -> Dict[str, str]:
         return {
@@ -166,6 +206,7 @@ class PlanIssue:
             "message": self.message,
             "action": self.action,
             "target": self.target,
+            "decision_id": self.decision_id,
         }
 
 
@@ -176,6 +217,9 @@ class PlanResult:
     `elements` 是**新增**的元素；`timeline` 是应用后的新时间线（输入不被修改）。
     有 errors 时 timeline 仍然返回 —— 能做的那部分照做，做不了的如实报，
     这样 AI 拿到反馈可以只修那一条决策，而不是整批重来。
+
+    `element_owner` 是「元素 id → 决策 id」的映射，决策溯源靠它，
+    不靠事后按时间猜（猜出来的溯源比没有更害人）。
     """
 
     timeline: Dict[str, Any]
@@ -183,6 +227,7 @@ class PlanResult:
     errors: List[PlanIssue] = field(default_factory=list)
     warnings: List[PlanIssue] = field(default_factory=list)
     applied: List[Dict[str, Any]] = field(default_factory=list)
+    element_owner: Dict[str, str] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -195,6 +240,7 @@ class PlanResult:
             "element_count": len(self.elements),
             "elements": [e.get("id", "") for e in self.elements],
             "applied": [d for d in self.applied],
+            "element_owner": dict(self.element_owner),
             "errors": [i.to_dict() for i in self.errors],
             "warnings": [i.to_dict() for i in self.warnings],
         }
@@ -227,13 +273,20 @@ class EditingPlanner:
         timeline: Dict[str, Any],
         decisions: Sequence[Any],
     ) -> PlanResult:
-        """把一批决策应用到时间线上，返回新时间线与报告。输入不被修改。"""
+        """把一批决策应用到时间线上，返回新时间线与报告。输入不被修改。
+
+        没带 `decision_id` 的决策会被按顺序补上（dec_001…）——
+        传进来的 EditingDecision 对象会被就地补号，这样调用方拿完结果
+        还能用同一批对象写溯源日志（core/provenance.record_plan）。
+        """
         result = PlanResult(timeline=copy.deepcopy(timeline))
         fps = tl.as_seconds((result.timeline.get("meta") or {}).get("fps")) or self._fps
-        for raw in decisions or []:
+        for index, raw in enumerate(decisions or []):
             decision = (
                 raw if isinstance(raw, EditingDecision) else EditingDecision.from_dict(raw)
             )
+            if not decision.decision_id:
+                decision.decision_id = f"dec_{index + 1:03d}"
             self._apply_one(result, decision, fps)
         result.timeline["meta"] = dict(result.timeline.get("meta") or {})
         result.timeline["meta"]["duration"] = tl.timeline_duration(result.timeline)
@@ -243,6 +296,7 @@ class EditingPlanner:
 
     def _apply_one(self, result: PlanResult, decision: EditingDecision, fps: float) -> None:
         action = decision.action
+        before_errors, before_warnings = len(result.errors), len(result.warnings)
         if action not in ACTIONS:
             result.errors.append(
                 PlanIssue(
@@ -252,13 +306,27 @@ class EditingPlanner:
                     decision.target,
                 )
             )
+            self._tag_issues(result, decision, before_errors, before_warnings)
             return
 
         handler = getattr(self, f"_do_{action}")
         before = len(result.elements)
         handler(result, decision, fps)
+        self._tag_issues(result, decision, before_errors, before_warnings)
         if len(result.elements) > before or action in ("cut", "trim"):
             result.applied.append(decision.to_dict())
+
+    @staticmethod
+    def _tag_issues(
+        result: PlanResult,
+        decision: EditingDecision,
+        before_errors: int,
+        before_warnings: int,
+    ) -> None:
+        """给这一轮新产生的问题补上决策号，溯源日志才能对上账。"""
+        for issue in result.errors[before_errors:] + result.warnings[before_warnings:]:
+            if not issue.decision_id:
+                issue.decision_id = decision.decision_id
 
     # ------------------------------------------------------------ 各动作
 
@@ -290,6 +358,8 @@ class EditingPlanner:
                     durations["freeze_duration"],
                     {},
                     decision.reason,
+                    decision.confidence,
+                    decision.decision_id,
                 ),
                 fps,
             )
@@ -303,6 +373,8 @@ class EditingPlanner:
                     durations["zoom_duration"],
                     {"scale_to": decision.params.get("scale_to", HIGHLIGHT_SCALE_TO)},
                     decision.reason,
+                    decision.confidence,
+                    decision.decision_id,
                 ),
                 fps,
             )
@@ -316,6 +388,8 @@ class EditingPlanner:
                     durations["sfx_duration"],
                     {"category": decision.params.get("sfx_category", "")},
                     decision.reason,
+                    decision.confidence,
+                    decision.decision_id,
                 ),
                 fps,
             )
@@ -331,6 +405,8 @@ class EditingPlanner:
                         durations["caption_duration"],
                         {"text": text, "emphasis": True, "safe_area": True},
                         decision.reason,
+                        decision.confidence,
+                        decision.decision_id,
                     ),
                     fps,
                 )
@@ -382,6 +458,8 @@ class EditingPlanner:
                 decision.duration,
                 {**merged, "name": "zoom"},
                 decision.reason,
+                decision.confidence,
+                decision.decision_id,
             ),
             fps,
         )
@@ -619,9 +697,12 @@ class EditingPlanner:
         if decision.reason:
             # note 是 schema 里给「人工实验备注」留的字段，不影响渲染。
             # AI 的判断理由写在这里，复核的人能看到「为什么这一刀」。
+            # 完整溯源（置信度 / 输入引用）另存 decisions.json，不塞进渲染数据。
             element["note"] = decision.reason
         result.timeline.setdefault("elements", []).append(element)
         result.elements.append(element)
+        if decision.decision_id:
+            result.element_owner[str(element.get("id", ""))] = decision.decision_id
 
     def _add_audio(
         self,
@@ -794,7 +875,197 @@ class EditingPlanner:
         return tl.next_element_id(timeline, type_name)
 
 
+# ---------------------------------------------------------------- AI 输出闸门
+#
+# 指令第三十三 / 四十二条：AI 的输出只能是 EditingDecision，且里面不许出现
+# TSX、ffmpeg 命令、绝对路径。这两件事在**进 Planner 之前**就该拦住 ——
+# 等到 Validator 才发现，中间已经生成了一堆基于胡话的元素。
+
+#: 决策 Schema 文件名（放在 schemas/ 下，与时间线 Schema 同级）
+DECISION_SCHEMA_FILE = "editing_decision_schema.json"
+
+#: AI 输出里绝对不该出现的东西：code → (人话, 触发词)
+FORBIDDEN_MARKERS: Dict[str, Any] = {
+    "AI_OUTPUT_TSX": ("AI 不许写 TSX / React 组件，只能给 EditingDecision",
+                      (".tsx", "import {", "<AbsoluteFill", "useCurrentFrame")),
+    "AI_OUTPUT_FFMPEG": ("AI 不许直接调 ffmpeg / Remotion CLI",
+                         ("ffmpeg", "ffprobe", "npx remotion", "remotion render")),
+    "AI_OUTPUT_ABSOLUTE_PATH": ("AI 不许写绝对路径，素材只能用 asset id",
+                                ("c:\\", "d:\\", "e:\\", "f:\\", "file://", "/users/", "/home/")),
+}
+
+
+def load_decision_schema(schemas_dir: str) -> Optional[Dict[str, Any]]:
+    """读决策 Schema。文件缺失返回 None，由调用方报成「未校验」而不是「通过」。"""
+    import json
+    import os
+
+    path = os.path.join(schemas_dir, DECISION_SCHEMA_FILE)
+    if not os.path.isfile(path):
+        return None
+    with open(path, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def forbidden_issues(payload: Any) -> List[PlanIssue]:
+    """扫一遍 AI 输出里的字符串，看有没有越界的东西。
+
+    只看**内容**，不看结构 —— 藏在 reason 里的 ffmpeg 命令行同样算越界，
+    因为那说明模型以为自己能那么干。
+    """
+    texts: List[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, str):
+            texts.append(node)
+        elif isinstance(node, dict):
+            for key, value in node.items():
+                texts.append(str(key))
+                walk(value)
+        elif isinstance(node, (list, tuple)):
+            for item in node:
+                walk(item)
+
+    walk(payload)
+    lowered = [t.lower() for t in texts]
+    issues: List[PlanIssue] = []
+    for code, (message, needles) in FORBIDDEN_MARKERS.items():
+        # 触发词也要转小写再比：不然 "<AbsoluteFill" 这种驼峰永远命不中
+        hit = next((n for n in (x.lower() for x in needles) for t in lowered if n in t), "")
+        if hit:
+            issues.append(PlanIssue(code, f"{message}（命中 {hit!r}）"))
+    return issues
+
+
+def decision_payload_issues(payload: Any, schemas_dir: str) -> List[PlanIssue]:
+    """决策 JSON 的入口体检：Schema + 内容闸门。
+
+    Schema 校验依赖 jsonschema；缺依赖或缺文件时报 `DECISION_SCHEMA_UNAVAILABLE`
+    警告，**不**假装校验过了。内容闸门不依赖任何库，永远在跑。
+    """
+    issues = forbidden_issues(payload)
+    schema = load_decision_schema(schemas_dir)
+    if schema is None:
+        issues.append(
+            PlanIssue("DECISION_SCHEMA_UNAVAILABLE",
+                      f"找不到 {DECISION_SCHEMA_FILE}，决策结构未经 Schema 校验")
+        )
+        return issues
+    try:
+        import jsonschema  # type: ignore
+    except ImportError:
+        issues.append(
+            PlanIssue("DECISION_SCHEMA_UNAVAILABLE",
+                      "没装 jsonschema，决策结构未经 Schema 校验")
+        )
+        return issues
+    validator = jsonschema.Draft7Validator(schema)
+    for error in sorted(validator.iter_errors(payload), key=lambda e: list(e.path)):
+        where = "/".join(str(p) for p in error.path) or "(根)"
+        issues.append(PlanIssue("DECISION_SCHEMA", f"{where}：{error.message}"))
+    return issues
+
+
+def decisions_from_payload(payload: Any) -> List[EditingDecision]:
+    """`{"decisions": [...]}` → EditingDecision 列表。不做校验，只做翻译。"""
+    rows = payload.get("decisions") if isinstance(payload, dict) else payload
+    return [EditingDecision.from_dict(raw) for raw in (rows or [])]
+
+
+# ---------------------------------------------------------------- 配音 → 决策
+
+
+
+@dataclass
+class VoiceDecisionBundle:
+    """voice markers 翻译出来的决策 + 被跳过的说明（指令第十七条）。"""
+
+    decisions: List[EditingDecision] = field(default_factory=list)
+    notes: List[PlanIssue] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "decisions": [d.to_dict() for d in self.decisions],
+            "notes": [n.to_dict() for n in self.notes],
+        }
+
+
+def decisions_from_voice_markers(
+    markers: Sequence[Dict[str, Any]],
+    with_sfx: bool = False,
+    min_gap: float = VOICE_PEAK_MIN_GAP,
+    limit: Optional[int] = None,
+) -> VoiceDecisionBundle:
+    """voice markers → EditingDecision 列表（指令第十七条）。
+
+    只做「翻译 + 去重」，不碰时间线、不校验素材 —— 那些是 Planner 与
+    Validator 的活。产出的动作一定在 `ACTIONS` 白名单里（映射表里写死的），
+    所以走这条路也绕不过白名单。
+
+    - `with_sfx=True` 时每个重音额外配一条 `sfx` 决策（分类 impact）；
+      音效到底存不存在由 Planner 查 AssetRegistry，这里不假设。
+    - `min_gap` 秒内的相邻重音只保留第一个，被丢掉的记进 notes。
+    - `limit` 限制最多产出多少个重音动作，免得一段长配音铺满特效。
+    """
+    bundle = VoiceDecisionBundle()
+    last_peak: Optional[float] = None
+    used = 0
+    for marker in markers or []:
+        if not isinstance(marker, dict):
+            continue
+        kind = str(marker.get("type") or "")
+        at = tl.as_seconds(marker.get("time"))
+        label = str(marker.get("label") or "")
+        plan = VOICE_MARKER_ACTIONS.get(kind)
+        if plan is None:
+            bundle.notes.append(
+                PlanIssue(
+                    "VOICE_MARKER_NO_ACTION",
+                    f"{kind or '(空)'} 标记（{at}s）不映射任何剪辑动作，只作为节奏信息保留",
+                )
+            )
+            continue
+        if last_peak is not None and at - last_peak < max(0.0, min_gap):
+            bundle.notes.append(
+                PlanIssue(
+                    "VOICE_PEAK_TOO_CLOSE",
+                    f"{at}s 的重音与上一个相隔 {round(at - last_peak, 3)}s"
+                    f"（< {min_gap}s），已跳过，免得动作叠成抽搐",
+                )
+            )
+            continue
+        if limit is not None and used >= limit:
+            bundle.notes.append(
+                PlanIssue("VOICE_PEAK_LIMIT", f"{at}s 的重音超出上限 {limit} 条，已跳过")
+            )
+            continue
+        reason = f"配音重音 @{at}s" + (f"：{label}" if label else "")
+        bundle.decisions.append(
+            EditingDecision(
+                action=str(plan["action"]),
+                start=at,
+                duration=tl.as_seconds(plan.get("duration")),
+                params=dict(plan.get("params") or {}),
+                reason=reason,
+            )
+        )
+        if with_sfx:
+            bundle.decisions.append(
+                EditingDecision(
+                    action="sfx",
+                    start=at,
+                    duration=HIGHLIGHT_DEFAULTS["sfx_duration"],
+                    params={"category": "impact"},
+                    reason=reason,
+                )
+            )
+        last_peak = at
+        used += 1
+    return bundle
+
+
 # ---------------------------------------------------------------- 能力自述
+
 
 
 def action_catalog() -> List[Dict[str, Any]]:

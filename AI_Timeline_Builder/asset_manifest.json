@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "scanned_at": "2026-08-30 22:02:45",
+  "scanned_at": "2026-08-31 21:58:07",
   "id_history": {
     "assets/audio/bgm/bgm_demo.wav": "sfx_bgm_001",
     "assets/audio/boom/boom_low_01.wav": "sfx_boom_001",
@@ -123,6 +123,7 @@
     "assets/audio/tts/tts_20260830_113621_第二句稍微长一点点用来验证顺延逻辑.wav": "sfx_tts_002",
     "assets/audio/tts/tts_20260830_113622_第三句配音测试.wav": "sfx_tts_003",
     "assets/audio/tts/tts_20260830_115834_啊啊啊啊.wav": "sfx_tts_001",
+    "assets/audio/tts/voice_en_female.wav": "sfx_tts_004",
     "assets/audio/ui/back_001.ogg": "sfx_ui_001",
     "assets/audio/ui/back_002.ogg": "sfx_ui_002",
     "assets/audio/ui/back_003.ogg": "sfx_ui_003",
@@ -256,7 +257,8 @@
     "assets/videos/demo/demo_a.mp4": "video_001",
     "assets/videos/demo/demo_b.mp4": "video_002",
     "assets/videos/imported/202608261927_tiktok_7677962144964463894_20260826_202153.mp4": "video_003",
-    "assets/videos/imported/demo.mp4": "video_004"
+    "assets/videos/imported/demo.mp4": "video_004",
+    "assets/videos/imported/video_各种搞笑素材，免费拿走_#素材分..._top_0_1.mp4": "video_005"
   },
   "assets": [
     {
@@ -2012,6 +2014,21 @@
         "tts"
       ],
       "thumbnail": ".cache/thumbs/assets_audio_tts_tts_20260830_115834_啊啊啊啊_wav.png",
+      "type": "audio"
+    },
+    {
+      "category": "tts",
+      "duration": 3.414,
+      "has_audio": true,
+      "id": "sfx_tts_004",
+      "name": "voice_en_female",
+      "path": "assets/audio/tts/voice_en_female.wav",
+      "size_bytes": 150592,
+      "tags": [
+        "audio",
+        "tts"
+      ],
+      "thumbnail": ".cache/thumbs/assets_audio_tts_voice_en_female_wav.png",
       "type": "audio"
     },
     {
@@ -4064,6 +4081,25 @@
       "thumbnail": ".cache/thumbs/assets_videos_imported_demo_mp4.png",
       "type": "video",
       "width": 810
+    },
+    {
+      "category": "imported",
+      "duration": 70.774,
+      "fps": 30.0,
+      "has_alpha": false,
+      "has_audio": true,
+      "height": 1280,
+      "name": "video_各种搞笑素材，免费拿走_#素材分..._top_0_1",
+      "path": "assets/videos/imported/video_各种搞笑素材，免费拿走_#素材分..._top_0_1.mp4",
+      "size_bytes": 2887110,
+      "tags": [
+        "imported",
+        "video"
+      ],
+      "thumbnail": ".cache/thumbs/assets_videos_imported_video_各种搞笑素材_免费拿走__素材分____top_0_1_mp4.png",
+      "type": "video",
+      "width": 720,
+      "id": "video_005"
     }
   ]
 }

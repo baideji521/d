@@ -23,6 +23,7 @@ if TOOLS not in sys.path:
 import build_catalog as bc  # noqa: E402
 
 from core import resolution as res  # noqa: E402
+from libraries.asset_registry import AssetRegistry  # noqa: E402
 from libraries.effect_library import EffectLibrary  # noqa: E402
 from libraries.sound_library import SoundLibrary  # noqa: E402
 from libraries.transition_library import TransitionLibrary  # noqa: E402
@@ -58,6 +59,11 @@ def transitions():
 @pytest.fixture(scope="module")
 def sounds():
     return SoundLibrary.from_manifest(bc.MANIFEST)
+
+
+@pytest.fixture(scope="module")
+def registry():
+    return AssetRegistry.from_manifest(bc.MANIFEST)
 
 
 @pytest.fixture(scope="module")
@@ -133,10 +139,27 @@ def test_转场文档列出全部转场(transitions):
         assert f"### `{name}`" in text
 
 
-def test_特效文档列出全部特效(effects):
-    text = bc.build_effect_catalog(effects, None, "未探测（测试固定）")
+def test_特效文档列出全部特效(effects, registry):
+    text = bc.build_effect_catalog(effects, None, "未探测（测试固定）", registry)
     for name in effects.names():
         assert f"### `{name}`" in text
+
+
+def test_素材特效缺素材时文档写MISSING而不是可用(effects, registry):
+    """素材特效没素材就渲染不出东西。文档必须写 MISSING，
+    不能因为「注册表里有」就标成可用 —— 否则 AI 会照着编时间线。"""
+    text = bc.build_effect_catalog(effects, None, "未探测（测试固定）", registry)
+    for definition in effects.material_effects():
+        hits = bc._material_assets(registry, definition.name)
+        section = text.split(f"### `{definition.name}`")[1].split("### ")[0]
+        if hits:
+            assert "AVAILABLE" in section, definition.name
+            for asset_id in hits:
+                assert asset_id in section
+        else:
+            assert "MISSING" in section, definition.name
+            assert "AVAILABLE" not in section, definition.name
+
 
 
 def test_音效文档把支持的类型与本地文件分开写(sounds):

@@ -183,6 +183,7 @@ def synthesize(
             pass
 
 
+
 class TtsWorker(QThread):
     """后台合成线程。合成要起 PowerShell 子进程，绝不能占着主线程。"""
 

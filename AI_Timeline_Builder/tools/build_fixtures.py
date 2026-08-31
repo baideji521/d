@@ -38,6 +38,7 @@ for path in (ROOT, ACCEPTANCE):
 import harness  # noqa: E402  out/acceptance/harness.py
 import analyze  # noqa: E402  out/acceptance/analyze.py（复用已验证的抽帧 / 度量通道）
 
+from core import resolution as res  # noqa: E402
 from core import safe_area as sa  # noqa: E402
 from core import timeline as tl  # noqa: E402
 from core.timeline_model import TimelineModel  # noqa: E402
@@ -404,6 +405,94 @@ def fx_res_16x9() -> Dict[str, Any]:
 
 def fx_res_1x1() -> Dict[str, Any]:
     return _resolution_fixture("比例 1:1", (1080, 1080))
+
+
+# ---------------------------------------------------------------- 分辨率全量矩阵
+
+#: 17 档预置分辨率的全量渲染矩阵。为什么单独一套而不塞进 FIXTURES：
+#: fixture 是「每次都跑」的小集合，塞进 17 档（含 3 个 4K）会让它变得没人愿意跑；
+#: 而分辨率矩阵是「改了分辨率体系才需要重跑」的大集合，分开更诚实。
+RESMATRIX_DIR = os.path.join(ACCEPTANCE, "json", "resmatrix")
+RESMATRIX_BATCH = os.path.join(ACCEPTANCE, "logs", "resmatrix_batch.json")
+RESMATRIX_PROBE = os.path.join(ACCEPTANCE, "logs", "resmatrix_probe.json")
+RESMATRIX_RENDER_DIR = os.path.join(ACCEPTANCE, "render", "resmatrix")
+
+#: 每档只渲 1.5 秒（45 帧）。指令第二十五条允许裁 1~2 秒 ——
+#: 要验的是「分辨率一路走到 MP4」，不是画面内容。
+RESMATRIX_SECONDS = 1.5
+
+
+def resmatrix_name(width: int, height: int) -> str:
+    return f"res_{int(width)}x{int(height)}"
+
+
+def fx_resmatrix(aspect_id: str, width: int, height: int) -> Dict[str, Any]:
+    """分辨率矩阵单档：真实 demo.mp4 裁 1.5 秒 + 一条标注分辨率的字幕。
+
+    带字幕是为了让「文字排版按画布比例走」也一起过一遍；
+    demo.mp4 自带音轨，所以音频探针也有东西可量。
+    """
+    return canonical(
+        f"分辨率 {aspect_id} {width}×{height}",
+        [
+            clip("clip_001", "demo", 0.0, 0.0, RESMATRIX_SECONDS),
+            tl.make_caption("caption_001", f"{aspect_id} {width}×{height}", "T1",
+                            0.2, RESMATRIX_SECONDS - 0.4),
+        ],
+        canvas=(int(width), int(height)),
+    )
+
+
+def resmatrix_timelines() -> Dict[str, Dict[str, Any]]:
+    """17 档全量。档位表来自 `core/resolution.py`，不在这里另写一份。"""
+    return {
+        resmatrix_name(width, height): fx_resmatrix(aspect_id, width, height)
+        for aspect_id, width, height in res.all_resolutions()
+    }
+
+
+def resmatrix_targets() -> List[tuple]:
+    return [
+        (name, os.path.join(RESMATRIX_DIR, f"{name}.json"),
+         os.path.join(RESMATRIX_RENDER_DIR, f"{name}.mp4"))
+        for name in resmatrix_timelines()
+    ]
+
+
+def build_resmatrix() -> int:
+    """生成 17 档时间线 + 渲染批次。校验不过就不写文件。"""
+    os.makedirs(RESMATRIX_DIR, exist_ok=True)
+    manifest = build_manifest()
+    copy_assets(manifest)
+    timelines = resmatrix_timelines()
+    rows = validate_all(manifest, timelines)
+    bad = [r for r in rows if not r["valid"]]
+    for row in rows:
+        print(f"{'OK  ' if row['valid'] else 'FAIL'} {row['name']:<16} "
+              f"{row['resolution']:>11}  {row['duration']:.2f}s")
+    if bad:
+        for row in bad:
+            for error in row["errors"]:
+                print(f"     {row['name']}: {error['rule']} {error['message']}")
+        return 1
+
+    for name, data in timelines.items():
+        harness.write_json(os.path.join(RESMATRIX_DIR, f"{name}.json"), data)
+    jobs = [
+        {
+            "name": name,
+            "timeline": os.path.join(RESMATRIX_DIR, f"{name}.json"),
+            "out": os.path.join(RESMATRIX_RENDER_DIR, f"{name}.mp4"),
+        }
+        for name in timelines
+    ]
+    harness.write_json(
+        RESMATRIX_BATCH,
+        {"manifest": MANIFEST_PATH, "remotion_dir": harness.REMOTION_DIR, "jobs": jobs},
+    )
+    harness.write_json(MANIFEST_PATH, manifest)
+    print(f"分辨率矩阵：{len(jobs)} 档，批次 {os.path.relpath(RESMATRIX_BATCH, ROOT)}")
+    return 0
 
 
 #: fixture 名 → 构造函数。顺序即渲染顺序（轻的先渲，早点看到结果）。
@@ -825,7 +914,8 @@ def probe(targets: Optional[List[tuple]] = None,
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="生成 / 校验 tests/fixtures")
-    parser.add_argument("command", choices=("build", "check", "probe"),
+    parser.add_argument("command",
+                        choices=("build", "check", "probe", "resmatrix"),
                         nargs="?", default="build")
     parser.add_argument("--batch", default="",
                         help="probe 用：渲染批次文件，量它列出的成片而不是 fixture")
@@ -836,6 +926,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return build()
     if args.command == "check":
         return check()
+    if args.command == "resmatrix":
+        return build_resmatrix()
     targets = batch_targets(args.batch) if args.batch else None
     return probe(targets, args.out or None)
 

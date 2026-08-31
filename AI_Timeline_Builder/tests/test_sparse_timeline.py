@@ -302,9 +302,8 @@ def test_13_反复往返不会长出字段(model):
 
 
 def test_13_真实_Demo_往返稳定(model):
-    path = os.path.join(ROOT, "remotion", "timeline.json")
-    if not os.path.exists(path):
-        pytest.skip("remotion/timeline.json 不存在")
+    path = os.path.join(ROOT, "tests", "fixtures", "demo_timeline.json")
+    assert os.path.isfile(path), "Demo 权威副本没了，先跑 tools/build_fixtures.py build"
     with open(path, "r", encoding="utf-8") as handle:
         data = json.load(handle)
     model.from_dict(data, "灌入 Demo")
@@ -320,9 +319,8 @@ def test_13_稀疏_JSON_能过校验(validator, model):
 
 
 def test_13_稀疏_Demo_能过校验(validator, model):
-    path = os.path.join(ROOT, "remotion", "timeline.json")
-    if not os.path.exists(path):
-        pytest.skip("remotion/timeline.json 不存在")
+    path = os.path.join(ROOT, "tests", "fixtures", "demo_timeline.json")
+    assert os.path.isfile(path), "Demo 权威副本没了，先跑 tools/build_fixtures.py build"
     with open(path, "r", encoding="utf-8") as handle:
         model.from_dict(json.load(handle), "灌入 Demo")
     issues = validator.validate(model.to_dict())

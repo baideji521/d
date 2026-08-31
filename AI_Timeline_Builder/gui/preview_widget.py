@@ -204,12 +204,21 @@ class PreviewCanvas(QWidget):
 
 
 class PreviewWidget(QWidget):
-    """预览面板：画面 + 播放控制条。"""
+    """预览面板：画面 + 播放控制条 + **真实音频**。
 
-    def __init__(self, model, renderer, parent=None) -> None:
+    音频由 `render/preview_audio.PreviewAudio` 提供（预混一份 WAV + QMediaPlayer）。
+    播放时**以音频时钟为准**推进播放头 —— 这样音视频不会越播越偏；
+    没有可播音频时（整片无声、缺 QtMultimedia、缺 ffmpeg）自动退回挂钟驱动，
+    行为与加音频之前完全一致。
+    """
+
+    def __init__(self, model, renderer, audio=None, parent=None) -> None:
         super().__init__(parent)
         self._model = model
         self._renderer = renderer
+        self._audio = audio
+        #: 正在按音频时钟同步播放头，此时不要再把播放头写回音频（否则来回抖）
+        self._syncing = False
 
         self.canvas = PreviewCanvas(model, renderer)
         self._timer = QTimer(self)
@@ -253,19 +262,20 @@ class PreviewWidget(QWidget):
         )
         self._safe_area.toggled.connect(self.canvas.set_safe_area_visible)
 
-        # 预览没有音频通路（本工程不做音频解码播放），所以这里控制的是
-        # **导出音量** meta.master_volume —— 影响渲染出的 MP4，不影响预览。
-        # 名字必须写清楚，否则用户会以为是预览音量而误以为坏了。
+        # 预览有真实音频通路（预混 WAV + QMediaPlayer），这里的音量 / 静音
+        # 写的是 **meta.master_volume** —— 它既进导出的 MP4，也进预览混音，
+        # 两边走 Remotion `resolveVolume()` 的同一套语义，不会「听着是一个值、
+        # 导出是另一个值」。
         self._mute_button = QPushButton("🔊")
         self._mute_button.setFixedWidth(32)
-        self._mute_button.setToolTip("导出静音开关（meta.master_volume=0），预览本身无声")
+        self._mute_button.setToolTip("静音开关（meta.master_volume=0），预览与导出同时生效")
         self._mute_button.clicked.connect(self.toggle_mute)
 
         self._volume = QSlider(Qt.Horizontal)
         self._volume.setFixedWidth(90)
         self._volume.setRange(0, 200)
         self._volume.setValue(100)
-        self._volume.setToolTip("导出音量 meta.master_volume（0~200%），预览无声")
+        self._volume.setToolTip("音量 meta.master_volume（0~200%），预览与导出同时生效")
         self._volume.sliderReleased.connect(self._commit_volume)
 
         self._quality = QComboBox()
@@ -323,18 +333,32 @@ class PreviewWidget(QWidget):
 
     # ------------------------------------------------------------ 播放控制
 
+    def audio_available(self) -> bool:
+        """当前有没有可播的预览音频。报告与用例用它区分「无声」和「坏了」。"""
+        return bool(self._audio is not None and self._audio.available())
+
+    def audio_status(self) -> str:
+        if self._audio is None:
+            return "未接预览音频通道"
+        return self._audio.status_text()
+
     def toggle_play(self) -> None:
         if self._timer.isActive():
             self.stop()
         else:
             self._play_origin = self._model.playhead
             self._clock.restart()
+            if self._audio is not None:
+                self._audio.sync_volume()
+                self._audio.play(self._play_origin)
             self._timer.start(0)
             self._apply_scale()
             self._play_button.setText("⏸ 暂停")
 
     def stop(self) -> None:
         self._timer.stop()
+        if self._audio is not None:
+            self._audio.pause()
         self._play_button.setText("▶ 播放")
         self._apply_scale()
 
@@ -342,21 +366,37 @@ class PreviewWidget(QWidget):
         return self._timer.isActive()
 
     def _advance_frame(self) -> None:
-        """按挂钟时间推进播放头，渲染跟不上就直接丢帧。
+        """推进播放头。**有声音时以音频时钟为准**，没声音时用挂钟。
 
-        以前是固定 QTimer.start(1000/fps) 每次加 1/fps，一帧画得比间隔久的时候
-        定时器事件就会堆起来，越播越慢、越播越卡；现在时间只由挂钟决定，
-        慢的时候表现为跳帧而不是拖慢。
+        为什么不一直用挂钟：挂钟和声卡时钟是两个独立时基，播一分钟就能差出
+        几十毫秒，而且渲染丢帧会让画面进一步落后。音频播放器的 position()
+        本身就是声卡消费到的位置，用它当时间源，音画偏差由构造保证。
+
+        挂钟那一套仍然保留：整片无声、缺 QtMultimedia、缺 ffmpeg 时都走它。
+        以前的行为（慢的时候跳帧而不是拖慢）也一样成立。
         """
         fps = max(1.0, self._model.fps)
         frame_ms = 1000.0 / fps
         elapsed = self._clock.elapsed() / 1000.0
-        next_time = self._play_origin + elapsed
+
+        audio_playing = self._audio is not None and self._audio.is_playing()
+        if audio_playing:
+            next_time = self._audio.position_seconds()
+        else:
+            next_time = self._play_origin + elapsed
+            # 音频刚混好还没开始播时，把它接上，别让这一段变成无声
+            if self._audio is not None and self.audio_available():
+                self._audio.play(next_time)
+
         if next_time >= self._model.duration:
             self.stop()
             self._model.set_playhead(0.0)
             return
-        self._model.set_playhead(next_time)
+        self._syncing = True
+        try:
+            self._model.set_playhead(next_time)
+        finally:
+            self._syncing = False
         self.canvas.repaint()   # 同步画完再计时，才能量出真实耗时并据此丢帧
 
         # 本帧实际耗时超过一帧间隔时，下一次立刻开始（丢掉中间那些帧）
@@ -437,9 +477,13 @@ class PreviewWidget(QWidget):
         self._update_info()
         self._sync_volume()
 
-    def _on_playhead_changed(self, _seconds: float) -> None:
+    def _on_playhead_changed(self, seconds: float) -> None:
         self.canvas.invalidate()
         self._update_info()
+        # 播放头是被别人挪的（拖时间线 / 快捷键 / 帧步进 / 跳转）→ 音频跟着跳。
+        # 自己按音频时钟推进的那一路要跳过，否则会不停 seek 自己，声音发抖。
+        if self._audio is not None and not self._syncing:
+            self._audio.seek(seconds)
 
     def _update_info(self) -> None:
         duration = self._model.duration
